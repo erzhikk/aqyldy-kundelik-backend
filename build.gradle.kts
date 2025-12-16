@@ -59,6 +59,10 @@ dependencies {
     // MinIO SDK (оставляем для совместимости, если понадобится)
     implementation("io.minio:minio:8.5.11")
 
+    // TwelveMonkeys ImageIO для поддержки дополнительных форматов (WebP, TIFF и т.д.)
+    implementation("com.twelvemonkeys.imageio:imageio-webp:3.11.0")
+    implementation("com.twelvemonkeys.imageio:imageio-core:3.11.0")
+
     // OpenAPI/Swagger UI
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0")
 
@@ -75,9 +79,10 @@ dependencies {
 }
 
 
-kotlin {
-    compilerOptions {
-        freeCompilerArgs.addAll("-Xjsr305=strict")
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
+    kotlinOptions {
+        freeCompilerArgs = listOf("-Xjsr305=strict")
+        jvmTarget = "21"
     }
 }
 

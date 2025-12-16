@@ -4,10 +4,14 @@ import kz.aqyldykundelik.attendance.repo.AttendanceRecordRepository
 import kz.aqyldykundelik.classes.api.mappers.toDto
 import kz.aqyldykundelik.classes.repo.ClassRepository
 import kz.aqyldykundelik.common.PageDto
+import kz.aqyldykundelik.media.domain.MediaObjectStatus
+import kz.aqyldykundelik.media.repo.MediaObjectRepository
+import kz.aqyldykundelik.media.service.MediaCleanupService
 import kz.aqyldykundelik.timetable.repo.SubjectRepository
 import kz.aqyldykundelik.timetable.repo.TimetableLessonRepository
 import kz.aqyldykundelik.users.api.dto.*
 import kz.aqyldykundelik.users.api.mappers.*
+import kz.aqyldykundelik.users.domain.UserEntity
 import kz.aqyldykundelik.users.repo.GroupRepository
 import kz.aqyldykundelik.users.repo.UserRepository
 import org.springframework.data.domain.PageRequest
@@ -25,7 +29,9 @@ class UserService(
     private val attendanceRecordRepository: AttendanceRecordRepository,
     private val timetableLessonRepository: TimetableLessonRepository,
     private val subjectRepository: SubjectRepository,
-    private val groupRepository: GroupRepository
+    private val groupRepository: GroupRepository,
+    private val mediaObjectRepository: MediaObjectRepository,
+    private val mediaCleanupService: MediaCleanupService
 ) {
 
     private val kazakhCollator = Collator.getInstance(Locale.forLanguageTag("kk-KZ")).apply {
@@ -36,7 +42,7 @@ class UserService(
         val pageable = PageRequest.of(page, size, Sort.by("fullName"))
         val result = userRepository.findAllByIsDeletedFalse(pageable)
         return PageDto(
-            content = result.content.map { it.toDto() },
+            content = result.content.map { it.toDto(generatePhotoUrl(it)) },
             page = result.number,
             size = result.size,
             totalElements = result.totalElements,
@@ -58,7 +64,8 @@ class UserService(
 
         val students = result.content.map { student ->
             val classEntity = student.classId?.let { classes[it] }
-            student.toDtoWithClass(classEntity)
+            val photoUrl = generatePhotoUrl(student)
+            student.toDtoWithClass(classEntity, photoUrl)
         }
 
         return PageDto(
@@ -75,7 +82,7 @@ class UserService(
         val pageable = PageRequest.of(page, size, Sort.by("fullName"))
         val result = userRepository.findAllByRoleInAndIsDeletedFalse(staffRoles, pageable)
         return PageDto(
-            content = result.content.map { it.toDto() },
+            content = result.content.map { it.toDto(generatePhotoUrl(it)) },
             page = result.number,
             size = result.size,
             totalElements = result.totalElements,
@@ -87,7 +94,7 @@ class UserService(
         val pageable = PageRequest.of(page, size, Sort.by("fullName"))
         val result = userRepository.findAllByIsDeletedTrue(pageable)
         return PageDto(
-            content = result.content.map { it.toDto() },
+            content = result.content.map { it.toDto(generatePhotoUrl(it)) },
             page = result.number,
             size = result.size,
             totalElements = result.totalElements,
@@ -95,10 +102,11 @@ class UserService(
         )
     }
 
-    fun findById(id: UUID): UserDto =
-        userRepository.findById(id)
+    fun findById(id: UUID): UserDto {
+        val user = userRepository.findById(id)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "User not found") }
-            .toDto()
+        return user.toDto(generatePhotoUrl(user))
+    }
 
     fun create(createDto: CreateUserDto): UserDto {
         // Валидация: classId можно присваивать только студентам
@@ -108,7 +116,8 @@ class UserService(
                 "classId can only be assigned to users with role STUDENT"
             )
         }
-        return userRepository.save(createDto.toEntity()).toDto()
+        val savedUser = userRepository.save(createDto.toEntity())
+        return savedUser.toDto(generatePhotoUrl(savedUser))
     }
 
     fun update(id: UUID, updateDto: UpdateUserDto): UserDto {
@@ -131,29 +140,54 @@ class UserService(
             user.classId = null
         }
 
-        return userRepository.save(user.applyUpdate(updateDto)).toDto()
+        // Если обновляется фото - удалить старое из хранилища
+        if (updateDto.photoMediaId != null && user.photoMediaId != null && updateDto.photoMediaId != user.photoMediaId) {
+            try {
+                mediaCleanupService.deleteMediaObject(user.photoMediaId!!)
+            } catch (e: Exception) {
+                // Игнорируем ошибки удаления - продолжаем загружать новое фото
+            }
+        }
+
+        val updatedUser = user.applyUpdate(updateDto)
+        val savedUser = userRepository.save(updatedUser)
+
+        return savedUser.toDto(generatePhotoUrl(savedUser))
     }
 
     fun deactivate(id: UUID): UserDto {
         val user = userRepository.findById(id)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "User not found") }
         user.isActive = false
-        return userRepository.save(user).toDto()
+        val savedUser = userRepository.save(user)
+        return savedUser.toDto(generatePhotoUrl(savedUser))
     }
 
     fun activate(id: UUID): UserDto {
         val user = userRepository.findById(id)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "User not found") }
         user.isActive = true
-        return userRepository.save(user).toDto()
+        val savedUser = userRepository.save(user)
+        return savedUser.toDto(generatePhotoUrl(savedUser))
     }
 
     fun delete(id: UUID): UserDto {
         val user = userRepository.findById(id)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "User not found") }
+
+        // Удалить фото пользователя из хранилища
+        user.photoMediaId?.let {
+            try {
+                mediaCleanupService.deleteMediaObject(it)
+            } catch (e: Exception) {
+                // Игнорируем ошибки удаления
+            }
+        }
+
         user.isDeleted = true
         user.isActive = false
-        return userRepository.save(user).toDto()
+        val savedUser = userRepository.save(user)
+        return savedUser.toDto(generatePhotoUrl(savedUser))
     }
 
     /**
@@ -174,7 +208,10 @@ class UserService(
         // Получаем статистику посещаемости
         val attendanceStats = calculateAttendanceStats(id)
 
-        return user.toStudentCard(classEntity, attendanceStats)
+        // Генерируем presigned URL для фото
+        val photoUrl = generatePhotoUrl(user)
+
+        return user.toStudentCard(classEntity, attendanceStats, photoUrl)
     }
 
     /**
@@ -198,7 +235,10 @@ class UserService(
         // Получаем список предметов, которые преподает
         val taughtSubjects = getTaughtSubjects(id)
 
-        return user.toStaffCard(classAsTeacher, taughtSubjects)
+        // Генерируем presigned URL для фото
+        val photoUrl = generatePhotoUrl(user)
+
+        return user.toStaffCard(classAsTeacher, taughtSubjects, photoUrl)
     }
 
     /**
@@ -261,5 +301,24 @@ class UserService(
             }
 
         return subjectMap
+    }
+
+    /**
+     * Генерация URL для фотографии пользователя через бэкенд proxy
+     * Возвращает URL только если photo_media_id существует и статус READY
+     */
+    private fun generatePhotoUrl(user: UserEntity): String? {
+        val photoMediaId = user.photoMediaId ?: return null
+
+        val mediaObject = mediaObjectRepository.findById(photoMediaId).orElse(null)
+            ?: return null
+
+        // Проверяем статус - только READY
+        if (mediaObject.status != MediaObjectStatus.READY) {
+            return null
+        }
+
+        // Генерируем URL к эндпоинту бэкенда (решает CORS проблему)
+        return "http://localhost:8080/api/media/photo/${photoMediaId}"
     }
 }

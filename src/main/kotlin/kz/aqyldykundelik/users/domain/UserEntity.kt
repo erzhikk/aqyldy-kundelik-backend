@@ -18,6 +18,7 @@ class UserEntity(
     @Column(name = "password_hash", nullable = false) var passwordHash: String = "",
     @Column(name = "class_id") var classId: UUID? = null,
     @Column(name = "date_of_birth") var dateOfBirth: LocalDate? = null,
+    @Column(name = "photo_media_id") var photoMediaId: UUID? = null,
     @Column(name = "created_at") var createdAt: OffsetDateTime? = null,
     @Column(name = "updated_at") var updatedAt: OffsetDateTime? = null,
 ) {

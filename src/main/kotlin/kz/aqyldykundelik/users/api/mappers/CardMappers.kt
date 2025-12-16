@@ -11,7 +11,8 @@ import kz.aqyldykundelik.users.domain.UserEntity
 
 fun UserEntity.toStudentCard(
     classEntity: ClassEntity?,
-    attendanceStats: AttendanceStatsDto?
+    attendanceStats: AttendanceStatsDto?,
+    photoUrl: String? = null
 ) = StudentCardDto(
     id = this.id!!,
     email = this.email!!,
@@ -19,13 +20,15 @@ fun UserEntity.toStudentCard(
     dateOfBirth = this.dateOfBirth,
     isActive = this.isActive,
     status = this.status,
+    photoUrl = photoUrl,
     schoolClass = classEntity?.toDto(),
     attendanceStats = attendanceStats
 )
 
 fun UserEntity.toStaffCard(
     classAsTeacher: ClassDto?,
-    taughtSubjects: List<TaughtSubjectDto>
+    taughtSubjects: List<TaughtSubjectDto>,
+    photoUrl: String? = null
 ) = StaffCardDto(
     id = this.id!!,
     email = this.email!!,
@@ -33,6 +36,7 @@ fun UserEntity.toStaffCard(
     role = this.role!!,
     isActive = this.isActive,
     status = this.status,
+    photoUrl = photoUrl,
     classAsTeacher = classAsTeacher,
     taughtSubjects = taughtSubjects
 )

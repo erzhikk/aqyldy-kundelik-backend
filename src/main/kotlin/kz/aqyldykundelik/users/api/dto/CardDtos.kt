@@ -14,6 +14,7 @@ data class StudentCardDto(
     val dateOfBirth: LocalDate?,
     val isActive: Boolean,
     val status: String,
+    val photoUrl: String? = null,  // Presigned URL для фото профиля
     val schoolClass: ClassDto?,
     val attendanceStats: AttendanceStatsDto?
 )
@@ -40,6 +41,7 @@ data class StaffCardDto(
     val role: String,
     val isActive: Boolean,
     val status: String,
+    val photoUrl: String? = null,  // Presigned URL для фото профиля
     val classAsTeacher: ClassDto?, // класс, в котором является классным руководителем
     val taughtSubjects: List<TaughtSubjectDto> // предметы, которые преподает
 )

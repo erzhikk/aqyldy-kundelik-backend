@@ -52,7 +52,12 @@ class SecurityConfig(
             .csrf { it.disable() }
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
             .authorizeHttpRequests {
-                it.requestMatchers("/actuator/health","/api/auth/**").permitAll()
+                it.requestMatchers(
+                    "/actuator/health",
+                    "/api/auth/**",
+                    "/api/media/upload/photo",
+                    "/api/media/photo/**"  // Публичный доступ к изображениям
+                ).permitAll()
                  .anyRequest().authenticated()
             }
             .oauth2ResourceServer { rs -> rs.jwt { j -> j.jwtAuthenticationConverter(conv).decoder(decoder) } }

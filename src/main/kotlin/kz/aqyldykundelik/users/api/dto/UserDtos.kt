@@ -18,6 +18,7 @@ data class UserDto(
     val isDeleted: Boolean,
     val classId: UUID?,
     val dateOfBirth: LocalDate?,
+    val photoUrl: String? = null,
     val classDto: ClassDto? = null
 )
 
@@ -28,7 +29,8 @@ data class CreateUserDto(
     val role: String,
     @field:NotBlank @field:Size(min = 6, max = 100) val password: String,
     val classId: UUID?,
-    val dateOfBirth: LocalDate?
+    val dateOfBirth: LocalDate?,
+    val photoMediaId: UUID? // ID медиа объекта для аватарки
 )
 
 data class UpdateUserDto(
@@ -37,5 +39,6 @@ data class UpdateUserDto(
     val role: String?,
     val status: String?, // ACTIVE/INACTIVE
     val classId: UUID?,
-    val dateOfBirth: LocalDate?
+    val dateOfBirth: LocalDate?,
+    val photoMediaId: UUID? // ID медиа объекта для аватарки
 )
