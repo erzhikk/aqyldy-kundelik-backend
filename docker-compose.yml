@@ -1,0 +1,84 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: aqyldy
+      POSTGRES_USER: aqyldy
+      POSTGRES_PASSWORD: aqyldy
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    networks:
+      - aqyldy-network
+
+  minio:
+    image: minio/minio:latest
+    container_name: aqyldy-minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    ports:
+      - "9000:9000"   # API
+      - "9001:9001"   # Console UI
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - aqyldy-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  imgproxy:
+    image: darthsim/imgproxy:latest
+    container_name: aqyldy-imgproxy
+    environment:
+      # Security keys (CHANGE THESE IN PRODUCTION!)
+      IMGPROXY_KEY: "943b421c9eb07c830af81030552c86009268de4e532ba2ee2eab8247c6da0881"
+      IMGPROXY_SALT: "520f986b998545b4785e0defbc4f3c1203f22de2374a3d53cb7a7fe9fea309c5"
+
+      # MinIO configuration
+      IMGPROXY_USE_S3: "true"
+      IMGPROXY_S3_ENDPOINT: "http://minio:9000"
+      AWS_ACCESS_KEY_ID: "minioadmin"
+      AWS_SECRET_ACCESS_KEY: "minioadmin123"
+      AWS_REGION: "us-east-1"
+
+      # Security settings
+      IMGPROXY_ALLOWED_SOURCES: "s3://aq-media/"
+      IMGPROXY_MAX_SRC_FILE_SIZE: "5242880"  # 5 MB
+      IMGPROXY_MAX_SRC_RESOLUTION: "16000000"  # 4000x4000
+
+      # Format settings
+      IMGPROXY_ENFORCE_WEBP: "false"
+      IMGPROXY_ENABLE_WEBP_DETECTION: "true"
+      IMGPROXY_JPEG_PROGRESSIVE: "true"
+      IMGPROXY_PNG_INTERLACED: "true"
+
+      # Performance
+      IMGPROXY_WORKERS: "4"
+      IMGPROXY_MAX_CLIENTS: "50"
+
+      # Logging
+      IMGPROXY_LOG_LEVEL: "info"
+      IMGPROXY_LOG_FORMAT: "json"
+    ports:
+      - "8082:8080"
+    networks:
+      - aqyldy-network
+    depends_on:
+      - minio
+    healthcheck:
+      test: ["CMD", "imgproxy", "health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  aqyldy-network:
+    driver: bridge
+
+volumes:
+  pgdata: {}
+  minio-data: {}
