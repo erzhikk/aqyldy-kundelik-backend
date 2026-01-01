@@ -48,10 +48,6 @@ fun CreateUserDto.toEntity(): UserEntity = UserEntity(
 )
 
 fun UserEntity.applyUpdate(u: UpdateUserDto): UserEntity = this.apply {
-    println("=== UserMappers.applyUpdate() START ===")
-    println("Current photoMediaId: ${this.photoMediaId}")
-    println("UpdateDto.photoMediaId: ${u.photoMediaId}")
-
     u.fullName?.let { fullName = it }
     u.role?.let { role = it }
     u.status?.let { status = it }
@@ -61,11 +57,5 @@ fun UserEntity.applyUpdate(u: UpdateUserDto): UserEntity = this.apply {
     dateOfBirth = u.dateOfBirth
     // photoMediaId обновляется только если явно передан (не null)
     // Для удаления фото нужно передать специальный маркер или использовать отдельный endpoint
-    u.photoMediaId?.let {
-        println("Updating photoMediaId to: $it")
-        photoMediaId = it
-    }
-
-    println("After update photoMediaId: ${this.photoMediaId}")
-    println("=== UserMappers.applyUpdate() END ===")
+    u.photoMediaId?.let { photoMediaId = it }
 }

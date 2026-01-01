@@ -4,6 +4,7 @@ import kz.aqyldykundelik.attendance.repo.AttendanceRecordRepository
 import kz.aqyldykundelik.classes.api.mappers.toDto
 import kz.aqyldykundelik.classes.repo.ClassRepository
 import kz.aqyldykundelik.common.PageDto
+import kz.aqyldykundelik.config.AppProperties
 import kz.aqyldykundelik.media.domain.MediaObjectStatus
 import kz.aqyldykundelik.media.repo.MediaObjectRepository
 import kz.aqyldykundelik.media.service.MediaCleanupService
@@ -31,7 +32,8 @@ class UserService(
     private val subjectRepository: SubjectRepository,
     private val groupRepository: GroupRepository,
     private val mediaObjectRepository: MediaObjectRepository,
-    private val mediaCleanupService: MediaCleanupService
+    private val mediaCleanupService: MediaCleanupService,
+    private val appProperties: AppProperties
 ) {
 
     private val kazakhCollator = Collator.getInstance(Locale.forLanguageTag("kk-KZ")).apply {
@@ -116,6 +118,10 @@ class UserService(
                 "classId can only be assigned to users with role STUDENT"
             )
         }
+
+        // Валидация photoMediaId
+        createDto.photoMediaId?.let { validatePhotoMediaId(it) }
+
         val savedUser = userRepository.save(createDto.toEntity())
         return savedUser.toDto(generatePhotoUrl(savedUser))
     }
@@ -139,6 +145,9 @@ class UserService(
         if (updateDto.role != null && updateDto.role != "STUDENT" && user.classId != null) {
             user.classId = null
         }
+
+        // Валидация photoMediaId
+        updateDto.photoMediaId?.let { validatePhotoMediaId(it) }
 
         // Если обновляется фото - удалить старое из хранилища
         if (updateDto.photoMediaId != null && user.photoMediaId != null && updateDto.photoMediaId != user.photoMediaId) {
@@ -186,6 +195,30 @@ class UserService(
 
         user.isDeleted = true
         user.isActive = false
+        val savedUser = userRepository.save(user)
+        return savedUser.toDto(generatePhotoUrl(savedUser))
+    }
+
+    fun deletePhoto(id: UUID): UserDto {
+        val user = userRepository.findById(id)
+            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "User not found") }
+
+        // Проверяем, есть ли фото для удаления
+        val photoMediaId = user.photoMediaId
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "User does not have a photo")
+
+        // Удаляем фото из хранилища
+        try {
+            mediaCleanupService.deleteMediaObject(photoMediaId)
+        } catch (e: Exception) {
+            throw ResponseStatusException(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                "Failed to delete photo from storage: ${e.message}"
+            )
+        }
+
+        // Обнуляем photoMediaId
+        user.photoMediaId = null
         val savedUser = userRepository.save(user)
         return savedUser.toDto(generatePhotoUrl(savedUser))
     }
@@ -304,6 +337,25 @@ class UserService(
     }
 
     /**
+     * Валидация photoMediaId перед сохранением
+     * Проверяет существование медиа объекта и его статус READY
+     */
+    private fun validatePhotoMediaId(photoMediaId: UUID) {
+        val mediaObject = mediaObjectRepository.findById(photoMediaId).orElse(null)
+            ?: throw ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Media object with id $photoMediaId not found"
+            )
+
+        if (mediaObject.status != MediaObjectStatus.READY) {
+            throw ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Media object must have READY status, current status: ${mediaObject.status}"
+            )
+        }
+    }
+
+    /**
      * Генерация URL для фотографии пользователя через бэкенд proxy
      * Возвращает URL только если photo_media_id существует и статус READY
      */
@@ -319,6 +371,6 @@ class UserService(
         }
 
         // Генерируем URL к эндпоинту бэкенда (решает CORS проблему)
-        return "http://localhost:8080/api/media/photo/${photoMediaId}"
+        return "${appProperties.baseUrl}/api/media/photo/${photoMediaId}"
     }
 }

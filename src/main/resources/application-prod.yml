@@ -15,3 +15,7 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+
+# Application Configuration
+app:
+  base-url: ${APP_BASE_URL:https://api.aqyldy.kz}

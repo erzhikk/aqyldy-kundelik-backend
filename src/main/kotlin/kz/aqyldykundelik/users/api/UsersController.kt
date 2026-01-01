@@ -61,6 +61,10 @@ class UsersController(private val userService: UserService) {
     @DeleteMapping("/{id}")
     fun delete(@PathVariable id: UUID): UserDto = userService.delete(id)
 
+    @PreAuthorize("hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @DeleteMapping("/{id}/photo")
+    fun deletePhoto(@PathVariable id: UUID): UserDto = userService.deletePhoto(id)
+
     @GetMapping("/student/{id}/card")
     fun getStudentCard(@PathVariable id: UUID): StudentCardDto = userService.getStudentCard(id)
 

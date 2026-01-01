@@ -85,36 +85,6 @@ class MediaPresignService(
         )
     }
 
-    /**
-     * Генерация presigned POST URL с политикой (полная реализация)
-     *
-     * Для MinIO с AWS SDK v2 нужно вручную создавать policy и signature
-     */
-    fun generatePhotoPresignPostUrl(request: PhotoPresignRequestDto): PhotoPresignResponseDto {
-        // Валидация
-        if (request.contentType !in ALLOWED_CONTENT_TYPES) {
-            throw ResponseStatusException(
-                HttpStatus.BAD_REQUEST,
-                "Content type not allowed: ${request.contentType}"
-            )
-        }
-
-        val fileExtension = getFileExtension(request.filename)
-        val objectKey = generateObjectKey(request.userId, fileExtension)
-
-        // Генерация policy для presigned POST
-        val policy = createPostPolicy(objectKey, request.contentType)
-        val encodedPolicy = Base64.getEncoder().encodeToString(policy.toByteArray())
-
-        // Для полной реализации нужно подписать policy с использованием AWS Signature V4
-        // Это сложная задача, поэтому используем presigned PUT как альтернативу
-        // В production лучше использовать MinIO SDK или готовую библиотеку
-
-        throw ResponseStatusException(
-            HttpStatus.NOT_IMPLEMENTED,
-            "Presigned POST not fully implemented. Use PUT method instead."
-        )
-    }
 
     /**
      * Генерация ключа объекта в формате: users/{userId}/photos/{uuid}.{ext}
@@ -133,26 +103,6 @@ class MediaPresignService(
             ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid filename: no extension")
     }
 
-    /**
-     * Создание policy для presigned POST
-     */
-    private fun createPostPolicy(key: String, contentType: String): String {
-        val expiration = Date(System.currentTimeMillis() + Duration.ofMinutes(PRESIGN_DURATION_MINUTES).toMillis())
-
-        // Policy в формате JSON (упрощенная версия)
-        return """
-            {
-              "expiration": "${expiration.toInstant()}",
-              "conditions": [
-                {"bucket": "${minioProperties.bucketName}"},
-                {"key": "$key"},
-                {"Content-Type": "$contentType"},
-                ["starts-with", "${'$'}Content-Type", "image/"],
-                ["content-length-range", 0, $MAX_FILE_SIZE]
-              ]
-            }
-        """.trimIndent()
-    }
 
     /**
      * Конвертация URL из virtual-hosted style в path-style

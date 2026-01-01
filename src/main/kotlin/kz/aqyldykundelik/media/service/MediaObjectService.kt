@@ -71,33 +71,6 @@ class MediaObjectService(
         return mediaObjectRepository.save(entity)
     }
 
-    /**
-     * Confirm upload - set status to READY and update file size
-     *
-     * Note: Этот метод устарел, используйте MediaReconcileService.reconcile() вместо него
-     */
-    @Deprecated("Use MediaReconcileService.reconcile() instead")
-    fun confirmUpload(id: UUID, fileSize: Long): MediaObjectEntity {
-        val entity = findById(id)
-        if (entity.status != MediaObjectStatus.UPLOADING) {
-            throw ResponseStatusException(
-                HttpStatus.BAD_REQUEST,
-                "Cannot confirm upload for media object with status ${entity.status}"
-            )
-        }
-        entity.status = MediaObjectStatus.READY
-        entity.fileSize = fileSize
-        return mediaObjectRepository.save(entity)
-    }
-
-    /**
-     * Confirm upload by S3 key - for backward compatibility
-     */
-    fun confirmUploadByS3Key(s3Key: String, fileSize: Long): MediaObjectEntity {
-        val entity = findByS3Key(s3Key)
-            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Media object not found for key: $s3Key")
-        return confirmUpload(entity.id!!, fileSize)
-    }
 
     /**
      * Soft delete - set status to DELETED

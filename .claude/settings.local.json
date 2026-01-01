@@ -8,7 +8,8 @@
       "Bash(curl -X POST http://localhost:8080/api/users -H \"Content-Type: application/json\" -d \"{\"\"tenantId\"\":\"\"123e4567-e89b-12d3-a456-426614174000\"\",\"\"email\"\":\"\"test@example.com\"\",\"\"fullName\"\":\"\"Test User\"\",\"\"role\"\":\"\"STUDENT\"\"}\")",
       "Bash(curl:*)",
       "Bash(docker exec:*)",
-      "Bash(docker cp:*)"
+      "Bash(docker cp:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []
