@@ -3,5 +3,20 @@ spring:
     name: aqyldy-kundelik-backend
   profiles:
     active: dev
+
 server:
   port: 8080
+
+# Logging Configuration
+logging:
+  level:
+    root: INFO
+    kz.aqyldykundelik: DEBUG
+    kz.aqyldykundelik.assessment.service.AuditService: INFO
+    org.springframework.web: DEBUG
+    org.springframework.security: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"

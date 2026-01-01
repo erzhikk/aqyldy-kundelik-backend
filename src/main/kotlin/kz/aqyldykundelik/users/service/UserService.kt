@@ -358,6 +358,7 @@ class UserService(
     /**
      * Генерация URL для фотографии пользователя через бэкенд proxy
      * Возвращает URL только если photo_media_id существует и статус READY
+     * Добавляет параметр ?v= для cache-busting (первые 8 символов sha256 или updatedAt)
      */
     private fun generatePhotoUrl(user: UserEntity): String? {
         val photoMediaId = user.photoMediaId ?: return null
@@ -370,7 +371,12 @@ class UserService(
             return null
         }
 
-        // Генерируем URL к эндпоинту бэкенда (решает CORS проблему)
-        return "${appProperties.baseUrl}/api/media/photo/${photoMediaId}"
+        // Генерируем версию для cache-busting
+        val version = mediaObject.sha256?.take(8)
+            ?: mediaObject.updatedAt?.toEpochSecond()?.toString()
+            ?: "1"
+
+        // Генерируем URL к эндпоинту бэкенда с параметром версии
+        return "${appProperties.baseUrl}/api/media/photo/${photoMediaId}?v=${version}"
     }
 }
