@@ -7,6 +7,7 @@ fun ClassEntity.toDto() = ClassDto(
     id = this.id!!,
     code = this.code!!,
     classTeacherId = this.classTeacherId,
+    classLevelId = this.classLevelId,
     langType = this.langType!!
 )
 
@@ -14,6 +15,7 @@ fun CreateClassDto.toEntity() = ClassEntity(
     id = null,
     code = this.code,
     classTeacherId = this.classTeacherId,
+    classLevelId = this.classLevelId,
     langType = this.langType
 )
 
@@ -24,4 +26,6 @@ fun ClassEntity.applyUpdate(update: UpdateClassDto): ClassEntity = this.apply {
     // Чтобы удалить учителя, передайте: {"classTeacherId": null}
     // ВАЖНО: если не передать поле вообще, оно тоже станет null!
     classTeacherId = update.classTeacherId
+    // classLevelId также обновляется ВСЕГДА
+    update.classLevelId?.let { classLevelId = it }
 }

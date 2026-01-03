@@ -30,7 +30,7 @@ class AttemptService(
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Test not found") }
 
         // Проверка: тест должен быть опубликован
-        if (!test.isPublished) {
+        if (test.status != kz.aqyldykundelik.assessment.domain.TestStatus.PUBLISHED) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Test is not published")
         }
 

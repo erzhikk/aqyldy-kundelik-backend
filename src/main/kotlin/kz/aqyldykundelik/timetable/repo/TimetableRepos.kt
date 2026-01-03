@@ -26,6 +26,13 @@ interface SubjectRepository : JpaRepository<SubjectEntity, UUID> {
     fun search(q: String?, pageable: Pageable): Page<SubjectEntity>
 
     fun findByClassLevel_Id(classLevelId: UUID, pageable: Pageable): Page<SubjectEntity>
+
+    @Query("""
+        SELECT s FROM SubjectEntity s
+        WHERE s.classLevel.id = :classLevelId
+        ORDER BY s.nameRu
+    """)
+    fun findAllByClassLevelId(classLevelId: UUID): List<SubjectEntity>
 }
 
 interface RoomRepository : JpaRepository<RoomEntity, UUID>

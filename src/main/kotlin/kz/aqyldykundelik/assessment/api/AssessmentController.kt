@@ -58,6 +58,16 @@ class AssessmentController(
     // ============= QUESTION ENDPOINTS =============
 
     @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER')")
+    @GetMapping("/questions")
+    fun getQuestions(
+        @RequestParam(required = false) subjectId: UUID?,
+        @RequestParam(required = false) topicId: UUID?,
+        @RequestParam(required = false) difficulty: kz.aqyldykundelik.assessment.domain.Difficulty?
+    ): List<QuestionDto> {
+        return questionService.findWithFilters(subjectId, topicId, difficulty)
+    }
+
+    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER')")
     @PostMapping("/questions")
     fun createQuestion(@Valid @RequestBody dto: CreateQuestionDto): QuestionDto {
         return questionService.create(dto)
@@ -105,10 +115,10 @@ class AssessmentController(
     @GetMapping("/tests")
     fun getTests(
         @RequestParam(required = false) subjectId: UUID?,
-        @RequestParam(required = false) grade: Int?,
-        @RequestParam(required = false) published: Boolean?
+        @RequestParam(required = false) classLevelId: UUID?,
+        @RequestParam(required = false) status: kz.aqyldykundelik.assessment.domain.TestStatus?
     ): List<TestDto> {
-        return testService.findAll(subjectId, grade, published)
+        return testService.findAll(subjectId, classLevelId, status)
     }
 
     @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER')")
@@ -139,6 +149,12 @@ class AssessmentController(
     @PostMapping("/tests/{id}/publish")
     fun publishTest(@PathVariable id: UUID): TestDto {
         return testService.publish(id)
+    }
+
+    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER')")
+    @PostMapping("/tests/{id}/clone")
+    fun cloneTest(@PathVariable id: UUID): TestDto {
+        return testService.clone(id)
     }
 
     // ============= STUDENT ATTEMPT ENDPOINTS =============

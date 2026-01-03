@@ -23,7 +23,12 @@ class SubjectController(private val subjectService: SubjectService) {
     fun getById(@PathVariable id: UUID): SubjectDto = subjectService.findById(id)
 
     @GetMapping("/by-class-level/{classLevelId}")
-    fun getByClassLevel(
+    fun getByClassLevel(@PathVariable classLevelId: UUID): List<SubjectDto> {
+        return subjectService.findByClassLevelId(classLevelId)
+    }
+
+    @GetMapping("/by-class-level/{classLevelId}/paged")
+    fun getByClassLevelPaged(
         @PathVariable classLevelId: UUID,
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "20") size: Int

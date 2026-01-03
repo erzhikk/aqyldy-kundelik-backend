@@ -10,6 +10,7 @@ class ClassEntity(
     @Id @GeneratedValue(strategy = GenerationType.UUID) var id: UUID? = null,
     @Column(nullable = false, length = 3) var code: String? = null,
     @Column(name = "class_teacher_id") var classTeacherId: UUID? = null,
+    @Column(name = "class_level_id") var classLevelId: UUID? = null,
     @Column(name = "lang_type", nullable = false, length = 3) var langType: String? = null,
     @Column(name = "created_at") var createdAt: OffsetDateTime? = null,
     @Column(name = "updated_at") var updatedAt: OffsetDateTime? = null

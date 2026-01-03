@@ -1,6 +1,7 @@
 package kz.aqyldykundelik.assessment.domain
 
 import jakarta.persistence.*
+import java.math.BigDecimal
 import java.time.OffsetDateTime
 import java.util.*
 
@@ -14,20 +15,24 @@ class TestEntity(
     @Column(name = "subject_id", nullable = false)
     var subjectId: UUID,
 
+    @Column(name = "class_level_id")
+    var classLevelId: UUID? = null,
+
     @Column(nullable = false)
     var name: String,
 
     @Column
-    var grade: Int? = null,
+    var description: String? = null,
 
     @Column(name = "duration_sec")
     var durationSec: Int? = null,
 
-    @Column(name = "max_score")
-    var maxScore: Int? = null,
+    @Column(name = "max_score", nullable = false)
+    var maxScore: Int = 0,
 
-    @Column(name = "is_published", nullable = false)
-    var isPublished: Boolean = false,
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    var status: TestStatus = TestStatus.DRAFT,
 
     @Column(name = "shuffle_questions", nullable = false)
     var shuffleQuestions: Boolean = true,
@@ -37,6 +42,19 @@ class TestEntity(
 
     @Column(name = "allowed_attempts")
     var allowedAttempts: Int? = null,
+
+    @Column(name = "opens_at")
+    var opensAt: OffsetDateTime? = null,
+
+    @Column(name = "closes_at")
+    var closesAt: OffsetDateTime? = null,
+
+    @Column(name = "passing_percent", precision = 5, scale = 2)
+    var passingPercent: BigDecimal? = null,
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "review_policy")
+    var reviewPolicy: ReviewPolicy? = null,
 
     @Column(name = "created_at", nullable = false)
     var createdAt: OffsetDateTime? = null,

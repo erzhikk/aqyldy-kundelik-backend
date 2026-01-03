@@ -13,11 +13,14 @@ import java.util.*
 @RequestMapping("/api/class-levels")
 class ClassLevelController(private val classLevelService: ClassLevelService) {
 
+    @GetMapping("/all")
+    fun listAll(): List<ClassLevelDto> = classLevelService.findAll()
+
     @GetMapping
     fun list(
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "20") size: Int
-    ): PageDto<ClassLevelDto> = classLevelService.findAll(page, size)
+    ): PageDto<ClassLevelDto> = classLevelService.findAllPaged(page, size)
 
     @GetMapping("/{id}")
     fun getById(@PathVariable id: UUID): ClassLevelDto = classLevelService.findById(id)

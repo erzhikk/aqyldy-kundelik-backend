@@ -85,6 +85,14 @@ class QuestionService(
         return question.toDto(choices)
     }
 
+    fun findWithFilters(subjectId: UUID?, topicId: UUID?, difficulty: kz.aqyldykundelik.assessment.domain.Difficulty?): List<QuestionDto> {
+        val questions = questionRepository.findWithFilters(subjectId, topicId, difficulty)
+        return questions.map { question ->
+            val choices = choiceRepository.findByQuestionId(question.id!!)
+            question.toDto(choices)
+        }
+    }
+
     @Transactional
     fun delete(id: UUID) {
         if (!questionRepository.existsById(id)) {

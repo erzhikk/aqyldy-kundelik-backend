@@ -4,6 +4,10 @@ import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotEmpty
 import jakarta.validation.constraints.NotNull
 import kz.aqyldykundelik.assessment.domain.Difficulty
+import kz.aqyldykundelik.assessment.domain.ReviewPolicy
+import kz.aqyldykundelik.assessment.domain.TestStatus
+import java.math.BigDecimal
+import java.time.OffsetDateTime
 import java.util.*
 
 // ============= TOPIC DTOs =============
@@ -69,47 +73,67 @@ data class QuestionDto(
 
 data class CreateTestDto(
     @field:NotNull val subjectId: UUID,
+    val classLevelId: UUID? = null,
     @field:NotBlank val name: String,
-    val grade: Int? = null,
+    val description: String? = null,
     val durationSec: Int? = null,
+    val allowedAttempts: Int? = null,
+    val opensAt: OffsetDateTime? = null,
+    val closesAt: OffsetDateTime? = null,
     val shuffleQuestions: Boolean = true,
     val shuffleChoices: Boolean = true,
-    val allowedAttempts: Int? = null
+    val passingPercent: BigDecimal? = null,
+    val reviewPolicy: ReviewPolicy? = null
 )
 
 data class UpdateTestDto(
     @field:NotBlank val name: String,
-    val grade: Int? = null,
+    val classLevelId: UUID? = null,
+    val description: String? = null,
     val durationSec: Int? = null,
+    val allowedAttempts: Int? = null,
+    val opensAt: OffsetDateTime? = null,
+    val closesAt: OffsetDateTime? = null,
     val shuffleQuestions: Boolean = true,
     val shuffleChoices: Boolean = true,
-    val allowedAttempts: Int? = null
+    val passingPercent: BigDecimal? = null,
+    val reviewPolicy: ReviewPolicy? = null
 )
 
 data class TestDto(
     val id: UUID,
     val subjectId: UUID,
+    val classLevelId: UUID?,
     val name: String,
-    val grade: Int?,
+    val description: String?,
     val durationSec: Int?,
-    val maxScore: Int?,
-    val isPublished: Boolean,
+    val maxScore: Int,
+    val status: TestStatus,
     val shuffleQuestions: Boolean,
     val shuffleChoices: Boolean,
-    val allowedAttempts: Int?
+    val allowedAttempts: Int?,
+    val opensAt: OffsetDateTime?,
+    val closesAt: OffsetDateTime?,
+    val passingPercent: BigDecimal?,
+    val reviewPolicy: ReviewPolicy?
 )
 
 data class TestDetailDto(
     val id: UUID,
     val subjectId: UUID,
+    val classLevelId: UUID?,
     val name: String,
-    val grade: Int?,
+    val description: String?,
     val durationSec: Int?,
-    val maxScore: Int?,
-    val isPublished: Boolean,
+    val maxScore: Int,
+    val status: TestStatus,
     val shuffleQuestions: Boolean,
     val shuffleChoices: Boolean,
     val allowedAttempts: Int?,
+    val opensAt: OffsetDateTime?,
+    val closesAt: OffsetDateTime?,
+    val passingPercent: BigDecimal?,
+    val reviewPolicy: ReviewPolicy?,
     val questions: List<TestQuestionDto>
 )
 
@@ -119,7 +143,7 @@ data class TestQuestionDto(
     val difficulty: Difficulty,
     val order: Int,
     val weight: Int,
-    val choices: List<ChoiceDto>  // isCorrect will be hidden for students
+    val choices: List<AttemptChoiceDto>  // No isCorrect - preview as student sees it
 )
 
 // ============= TEST QUESTION MANAGEMENT DTOs =============

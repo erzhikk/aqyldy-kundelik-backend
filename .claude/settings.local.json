@@ -9,7 +9,9 @@
       "Bash(curl:*)",
       "Bash(docker exec:*)",
       "Bash(docker cp:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(psql:*)"
     ],
     "deny": [],
     "ask": []

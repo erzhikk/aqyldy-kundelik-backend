@@ -18,7 +18,11 @@ import java.util.*
 @Service
 class ClassLevelService(private val classLevelRepository: ClassLevelRepository) {
 
-    fun findAll(page: Int = 0, size: Int = 20): PageDto<ClassLevelDto> {
+    fun findAll(): List<ClassLevelDto> {
+        return classLevelRepository.findAll(Sort.by("level")).map { it.toDto() }
+    }
+
+    fun findAllPaged(page: Int = 0, size: Int = 20): PageDto<ClassLevelDto> {
         val pageable = PageRequest.of(page, size, Sort.by("level"))
         val result = classLevelRepository.findAll(pageable)
         return PageDto(

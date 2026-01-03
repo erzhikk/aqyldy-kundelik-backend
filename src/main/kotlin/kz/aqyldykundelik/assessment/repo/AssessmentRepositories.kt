@@ -17,15 +17,29 @@ interface TopicRepository : JpaRepository<TopicEntity, UUID> {
 @Repository
 interface TestRepository : JpaRepository<TestEntity, UUID> {
     fun findBySubjectId(subjectId: UUID): List<TestEntity>
-    fun findBySubjectIdAndIsPublished(subjectId: UUID, isPublished: Boolean): List<TestEntity>
-    fun findByGrade(grade: Int): List<TestEntity>
-    fun findByIsPublished(isPublished: Boolean): List<TestEntity>
+    fun findBySubjectIdAndStatus(subjectId: UUID, status: kz.aqyldykundelik.assessment.domain.TestStatus): List<TestEntity>
+    fun findByClassLevelId(classLevelId: UUID): List<TestEntity>
+    fun findByStatus(status: kz.aqyldykundelik.assessment.domain.TestStatus): List<TestEntity>
 }
 
 @Repository
 interface QuestionRepository : JpaRepository<QuestionEntity, UUID> {
     fun findByTopicId(topicId: UUID): List<QuestionEntity>
     fun findByDifficulty(difficulty: Difficulty): List<QuestionEntity>
+
+    @Query("""
+        SELECT q FROM QuestionEntity q
+        JOIN TopicEntity t ON q.topicId = t.id
+        WHERE (:subjectId IS NULL OR t.subjectId = :subjectId)
+        AND (:topicId IS NULL OR q.topicId = :topicId)
+        AND (:difficulty IS NULL OR q.difficulty = :difficulty)
+        ORDER BY q.topicId, q.difficulty
+    """)
+    fun findWithFilters(
+        @Param("subjectId") subjectId: UUID?,
+        @Param("topicId") topicId: UUID?,
+        @Param("difficulty") difficulty: Difficulty?
+    ): List<QuestionEntity>
 }
 
 @Repository

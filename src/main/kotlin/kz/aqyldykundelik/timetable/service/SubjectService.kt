@@ -39,6 +39,10 @@ class SubjectService(
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Subject not found") }
             .toDto()
 
+    fun findByClassLevelId(classLevelId: UUID): List<SubjectDto> {
+        return subjectRepository.findAllByClassLevelId(classLevelId).map { it.toDto() }
+    }
+
     fun findByClassLevel(classLevelId: UUID, page: Int = 0, size: Int = 20): PageDto<SubjectDto> {
         val pageable = PageRequest.of(page, size, Sort.by("nameRu"))
         val result = subjectRepository.findByClassLevel_Id(classLevelId, pageable)
