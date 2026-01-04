@@ -6,6 +6,8 @@ import kz.aqyldykundelik.assessment.domain.TestEntity
 import kz.aqyldykundelik.assessment.domain.TestQuestionEntity
 import kz.aqyldykundelik.assessment.domain.TestQuestionId
 import kz.aqyldykundelik.assessment.repo.*
+import kz.aqyldykundelik.common.PageDto
+import org.springframework.data.domain.PageRequest
 import org.springframework.http.HttpStatus
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
@@ -121,7 +123,13 @@ class TestService(
         testRepository.deleteById(id)
     }
 
-    fun findAll(subjectId: UUID?, classLevelId: UUID?, status: kz.aqyldykundelik.assessment.domain.TestStatus?): List<TestDto> {
+    fun findAll(
+        subjectId: UUID?,
+        classLevelId: UUID?,
+        status: kz.aqyldykundelik.assessment.domain.TestStatus?,
+        page: Int,
+        size: Int
+    ): PageDto<TestDto> {
         val tests = when {
             subjectId != null && status != null ->
                 testRepository.findBySubjectIdAndStatus(subjectId, status)
@@ -134,7 +142,27 @@ class TestService(
             else ->
                 testRepository.findAll()
         }
-        return tests.map { it.toDto() }
+
+        val testDtos = tests.map { it.toDto() }
+        val totalElements = testDtos.size.toLong()
+        val totalPages = if (size > 0) ((totalElements + size - 1) / size).toInt() else 1
+
+        // Apply pagination in memory
+        val startIndex = page * size
+        val endIndex = minOf(startIndex + size, testDtos.size)
+        val content = if (startIndex < testDtos.size) {
+            testDtos.subList(startIndex, endIndex)
+        } else {
+            emptyList()
+        }
+
+        return PageDto(
+            content = content,
+            page = page,
+            size = size,
+            totalElements = totalElements,
+            totalPages = totalPages
+        )
     }
 
     fun findById(id: UUID): TestDetailDto {

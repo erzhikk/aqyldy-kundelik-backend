@@ -8,6 +8,7 @@ import kz.aqyldykundelik.assessment.service.AuditService
 import kz.aqyldykundelik.assessment.service.QuestionService
 import kz.aqyldykundelik.assessment.service.TestService
 import kz.aqyldykundelik.assessment.service.TopicService
+import kz.aqyldykundelik.common.PageDto
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.security.access.prepost.PreAuthorize
@@ -34,19 +35,20 @@ class AssessmentController(
         return try {
             UUID.fromString(userId)
         } catch (e: IllegalArgumentException) {
-            throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid user ID")
+            logger.error("Failed to parse userId from JWT. auth.name = '$userId'", e)
+            throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid user ID format in token")
         }
     }
 
     // ============= TOPIC ENDPOINTS =============
 
-    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER')")
+    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER') or hasRole('SUPER_ADMIN')")
     @PostMapping("/topics")
     fun createTopic(@Valid @RequestBody dto: CreateTopicDto): TopicDto {
         return topicService.create(dto)
     }
 
-    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER')")
+    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER') or hasRole('SUPER_ADMIN')")
     @GetMapping("/topics")
     fun getTopics(
         @RequestParam(required = false) subjectId: UUID?,
@@ -57,7 +59,7 @@ class AssessmentController(
 
     // ============= QUESTION ENDPOINTS =============
 
-    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER')")
+    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER') or hasRole('SUPER_ADMIN')")
     @GetMapping("/questions")
     fun getQuestions(
         @RequestParam(required = false) subjectId: UUID?,
@@ -67,13 +69,13 @@ class AssessmentController(
         return questionService.findWithFilters(subjectId, topicId, difficulty)
     }
 
-    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER')")
+    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER') or hasRole('SUPER_ADMIN')")
     @PostMapping("/questions")
     fun createQuestion(@Valid @RequestBody dto: CreateQuestionDto): QuestionDto {
         return questionService.create(dto)
     }
 
-    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER')")
+    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER') or hasRole('SUPER_ADMIN')")
     @PutMapping("/questions/{id}")
     fun updateQuestion(
         @PathVariable id: UUID,
@@ -82,7 +84,7 @@ class AssessmentController(
         return questionService.update(id, dto)
     }
 
-    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER')")
+    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER') or hasRole('SUPER_ADMIN')")
     @DeleteMapping("/questions/{id}")
     fun deleteQuestion(@PathVariable id: UUID) {
         questionService.delete(id)
@@ -90,13 +92,13 @@ class AssessmentController(
 
     // ============= TEST ENDPOINTS =============
 
-    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER')")
+    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER') or hasRole('SUPER_ADMIN')")
     @PostMapping("/tests")
     fun createTest(@Valid @RequestBody dto: CreateTestDto): TestDto {
         return testService.create(dto)
     }
 
-    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER')")
+    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER') or hasRole('SUPER_ADMIN')")
     @PutMapping("/tests/{id}")
     fun updateTest(
         @PathVariable id: UUID,
@@ -105,29 +107,31 @@ class AssessmentController(
         return testService.update(id, dto)
     }
 
-    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER')")
+    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER') or hasRole('SUPER_ADMIN')")
     @DeleteMapping("/tests/{id}")
     fun deleteTest(@PathVariable id: UUID) {
         testService.delete(id)
     }
 
-    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER') or hasRole('SUPER_ADMIN') ")
+    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER') or hasRole('SUPER_ADMIN')")
     @GetMapping("/tests")
     fun getTests(
         @RequestParam(required = false) subjectId: UUID?,
         @RequestParam(required = false) classLevelId: UUID?,
-        @RequestParam(required = false) status: kz.aqyldykundelik.assessment.domain.TestStatus?
-    ): List<TestDto> {
-        return testService.findAll(subjectId, classLevelId, status)
+        @RequestParam(required = false) status: kz.aqyldykundelik.assessment.domain.TestStatus?,
+        @RequestParam(defaultValue = "0") page: Int,
+        @RequestParam(defaultValue = "20") size: Int
+    ): PageDto<TestDto> {
+        return testService.findAll(subjectId, classLevelId, status, page, size)
     }
 
-    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER')")
+    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER') or hasRole('SUPER_ADMIN')")
     @GetMapping("/tests/{id}")
     fun getTestDetail(@PathVariable id: UUID): TestDetailDto {
         return testService.findById(id)
     }
 
-    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER')")
+    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER') or hasRole('SUPER_ADMIN')")
     @PostMapping("/tests/{id}/questions")
     fun addQuestionsToTest(
         @PathVariable id: UUID,
@@ -136,7 +140,7 @@ class AssessmentController(
         return testService.addQuestions(id, dto)
     }
 
-    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER')")
+    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER') or hasRole('SUPER_ADMIN')")
     @PutMapping("/tests/{id}/questions/reorder")
     fun reorderQuestions(
         @PathVariable id: UUID,
@@ -145,13 +149,13 @@ class AssessmentController(
         return testService.reorderQuestions(id, dto)
     }
 
-    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER')")
+    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER') or hasRole('SUPER_ADMIN')")
     @PostMapping("/tests/{id}/publish")
     fun publishTest(@PathVariable id: UUID): TestDto {
         return testService.publish(id)
     }
 
-    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER')")
+    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER') or hasRole('SUPER_ADMIN')")
     @PostMapping("/tests/{id}/clone")
     fun cloneTest(@PathVariable id: UUID): TestDto {
         return testService.clone(id)
@@ -203,18 +207,30 @@ class AssessmentController(
 
     // ============= ANALYTICS ENDPOINTS =============
 
-    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER')")
+    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER') or hasRole('STUDENT') or hasRole('SUPER_ADMIN')")
     @GetMapping("/analytics/student/{studentId}/topics")
     fun getStudentTopicAnalytics(
         @PathVariable studentId: UUID,
         @RequestParam(required = false) subjectId: UUID?,
         @RequestParam(required = false) from: OffsetDateTime?,
-        @RequestParam(required = false) to: OffsetDateTime?
+        @RequestParam(required = false) to: OffsetDateTime?,
+        auth: Authentication
     ): List<StudentTopicAnalyticsDto> {
+        logger.debug("getStudentTopicAnalytics called. auth.name='${auth.name}', authorities=${auth.authorities.map { it.authority }}")
+
+        // Students can only view their own analytics
+        if (auth.authorities.any { it.authority == "ROLE_STUDENT" }) {
+            val currentUserId = getStudentIdFromAuth(auth)
+            if (currentUserId != studentId) {
+                throw ResponseStatusException(HttpStatus.FORBIDDEN, "Students can only view their own analytics")
+            }
+        }
+        // Teachers, admins can view any student's analytics without validation
+
         return analyticsService.getStudentTopicAnalytics(studentId, subjectId, from, to)
     }
 
-    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER')")
+    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER') or hasRole('SUPER_ADMIN')")
     @GetMapping("/analytics/class/{classId}/tests/{testId}")
     fun getClassTestAnalytics(
         @PathVariable classId: UUID,

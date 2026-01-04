@@ -70,14 +70,14 @@ interface TestAttemptRepository : JpaRepository<TestAttemptEntity, UUID> {
 
     // Analytics: Find graded attempts for a student with optional filters
     @Query("""
-        SELECT ta FROM TestAttemptEntity ta
-        JOIN TestEntity t ON ta.testId = t.id
-        WHERE ta.studentId = :studentId
+        SELECT ta.* FROM test_attempt ta
+        JOIN test t ON ta.test_id = t.id
+        WHERE ta.student_id = :studentId
         AND ta.status = 'GRADED'
-        AND (:subjectId IS NULL OR t.subjectId = :subjectId)
-        AND (:from IS NULL OR ta.finishedAt >= :from)
-        AND (:to IS NULL OR ta.finishedAt <= :to)
-    """)
+        AND (CAST(:subjectId AS uuid) IS NULL OR t.subject_id = CAST(:subjectId AS uuid))
+        AND (CAST(:from AS timestamptz) IS NULL OR ta.finished_at >= CAST(:from AS timestamptz))
+        AND (CAST(:to AS timestamptz) IS NULL OR ta.finished_at <= CAST(:to AS timestamptz))
+    """, nativeQuery = true)
     fun findGradedAttemptsForStudent(
         @Param("studentId") studentId: UUID,
         @Param("subjectId") subjectId: UUID?,
