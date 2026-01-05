@@ -5,9 +5,7 @@ import kz.aqyldykundelik.assessment.api.dto.*
 import kz.aqyldykundelik.assessment.service.AnalyticsService
 import kz.aqyldykundelik.assessment.service.AttemptService
 import kz.aqyldykundelik.assessment.service.AuditService
-import kz.aqyldykundelik.assessment.service.QuestionService
 import kz.aqyldykundelik.assessment.service.TestService
-import kz.aqyldykundelik.assessment.service.TopicService
 import kz.aqyldykundelik.common.PageDto
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
@@ -21,8 +19,6 @@ import java.util.*
 @RestController
 @RequestMapping("/api/assess")
 class AssessmentController(
-    private val topicService: TopicService,
-    private val questionService: QuestionService,
     private val testService: TestService,
     private val attemptService: AttemptService,
     private val analyticsService: AnalyticsService,
@@ -38,56 +34,6 @@ class AssessmentController(
             logger.error("Failed to parse userId from JWT. auth.name = '$userId'", e)
             throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid user ID format in token")
         }
-    }
-
-    // ============= TOPIC ENDPOINTS =============
-
-    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER') or hasRole('SUPER_ADMIN')")
-    @PostMapping("/topics")
-    fun createTopic(@Valid @RequestBody dto: CreateTopicDto): TopicDto {
-        return topicService.create(dto)
-    }
-
-    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER') or hasRole('SUPER_ADMIN')")
-    @GetMapping("/topics")
-    fun getTopics(
-        @RequestParam(required = false) subjectId: UUID?,
-        @RequestParam(required = false) q: String?
-    ): List<TopicDto> {
-        return topicService.findAll(subjectId, q)
-    }
-
-    // ============= QUESTION ENDPOINTS =============
-
-    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER') or hasRole('SUPER_ADMIN')")
-    @GetMapping("/questions")
-    fun getQuestions(
-        @RequestParam(required = false) subjectId: UUID?,
-        @RequestParam(required = false) topicId: UUID?,
-        @RequestParam(required = false) difficulty: kz.aqyldykundelik.assessment.domain.Difficulty?
-    ): List<QuestionDto> {
-        return questionService.findWithFilters(subjectId, topicId, difficulty)
-    }
-
-    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER') or hasRole('SUPER_ADMIN')")
-    @PostMapping("/questions")
-    fun createQuestion(@Valid @RequestBody dto: CreateQuestionDto): QuestionDto {
-        return questionService.create(dto)
-    }
-
-    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER') or hasRole('SUPER_ADMIN')")
-    @PutMapping("/questions/{id}")
-    fun updateQuestion(
-        @PathVariable id: UUID,
-        @Valid @RequestBody dto: UpdateQuestionDto
-    ): QuestionDto {
-        return questionService.update(id, dto)
-    }
-
-    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER') or hasRole('SUPER_ADMIN')")
-    @DeleteMapping("/questions/{id}")
-    fun deleteQuestion(@PathVariable id: UUID) {
-        questionService.delete(id)
     }
 
     // ============= TEST ENDPOINTS =============
@@ -163,7 +109,7 @@ class AssessmentController(
 
     // ============= STUDENT ATTEMPT ENDPOINTS =============
 
-    @PreAuthorize("hasRole('STUDENT')")
+    @PreAuthorize("hasRole('STUDENT') or hasRole('SUPER_ADMIN')")
     @PostMapping("/tests/{id}/attempts")
     fun startAttempt(
         @PathVariable id: UUID,
@@ -173,7 +119,7 @@ class AssessmentController(
         return attemptService.startAttempt(id, studentId)
     }
 
-    @PreAuthorize("hasRole('STUDENT')")
+    @PreAuthorize("hasRole('STUDENT') or hasRole('SUPER_ADMIN')")
     @PostMapping("/attempts/{attemptId}/answers")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun saveAnswers(
@@ -185,7 +131,7 @@ class AssessmentController(
         attemptService.saveAnswers(attemptId, studentId, dto)
     }
 
-    @PreAuthorize("hasRole('STUDENT')")
+    @PreAuthorize("hasRole('STUDENT') or hasRole('SUPER_ADMIN')")
     @PostMapping("/attempts/{attemptId}/submit")
     fun submitAttempt(
         @PathVariable attemptId: UUID,
@@ -195,7 +141,7 @@ class AssessmentController(
         return attemptService.submitAttempt(attemptId, studentId)
     }
 
-    @PreAuthorize("hasRole('STUDENT')")
+    @PreAuthorize("hasRole('STUDENT') or hasRole('SUPER_ADMIN')")
     @GetMapping("/attempts/{attemptId}/result")
     fun getAttemptResult(
         @PathVariable attemptId: UUID,

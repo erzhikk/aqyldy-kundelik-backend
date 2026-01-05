@@ -21,7 +21,10 @@ class TopicEntity(
     var description: String? = null,
 
     @Column(name = "created_at", nullable = false)
-    var createdAt: OffsetDateTime? = null
+    var createdAt: OffsetDateTime? = null,
+
+    @Column(name = "created_by_user_id")
+    var createdByUserId: UUID? = null
 ) {
     @PrePersist
     fun prePersist() {

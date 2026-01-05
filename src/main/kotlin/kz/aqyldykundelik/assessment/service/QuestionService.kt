@@ -6,6 +6,11 @@ import kz.aqyldykundelik.assessment.domain.ChoiceEntity
 import kz.aqyldykundelik.assessment.domain.QuestionEntity
 import kz.aqyldykundelik.assessment.repo.ChoiceRepository
 import kz.aqyldykundelik.assessment.repo.QuestionRepository
+import kz.aqyldykundelik.common.PageDto
+import org.springframework.context.MessageSource
+import org.springframework.context.i18n.LocaleContextHolder
+import org.springframework.data.domain.PageRequest
+import org.springframework.data.domain.Sort
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
@@ -14,7 +19,8 @@ import java.util.*
 @Service
 class QuestionService(
     private val questionRepository: QuestionRepository,
-    private val choiceRepository: ChoiceRepository
+    private val choiceRepository: ChoiceRepository,
+    private val messageSource: MessageSource
 ) {
 
     @Transactional
@@ -93,6 +99,41 @@ class QuestionService(
         }
     }
 
+    fun findByTopicWithAnswers(
+        topicId: UUID,
+        search: String?,
+        page: Int,
+        size: Int,
+        sort: String?
+    ): PageDto<QuestionDto> {
+        val pageable = PageRequest.of(page, size, parseSort(sort))
+        val questionPage = if (search.isNullOrBlank()) {
+            questionRepository.findByTopicId(topicId, pageable)
+        } else {
+            questionRepository.findByTopicIdAndTextContainingIgnoreCase(topicId, search, pageable)
+        }
+
+        val questionIds = questionPage.content.mapNotNull { it.id }
+        val choicesByQuestionId = if (questionIds.isEmpty()) {
+            emptyMap()
+        } else {
+            choiceRepository.findByQuestionIdIn(questionIds).groupBy { it.questionId }
+        }
+
+        val content = questionPage.content.map { question ->
+            val choices = choicesByQuestionId[question.id].orEmpty().sortedBy { it.order }
+            question.toDto(choices)
+        }
+
+        return PageDto(
+            content = content,
+            page = page,
+            size = size,
+            totalElements = questionPage.totalElements,
+            totalPages = questionPage.totalPages
+        )
+    }
+
     @Transactional
     fun delete(id: UUID) {
         if (!questionRepository.existsById(id)) {
@@ -103,11 +144,28 @@ class QuestionService(
     }
 
     private fun validateChoices(choices: List<CreateChoiceDto>) {
-        val correctCount = choices.count { it.isCorrect }
-        if (correctCount != 1) {
+        val locale = LocaleContextHolder.getLocale()
+        if (choices.size !in 4..5) {
+            val message = messageSource.getMessage(
+                "assessment.question.choices.count",
+                arrayOf(choices.size),
+                locale
+            )
             throw ResponseStatusException(
                 HttpStatus.BAD_REQUEST,
-                "Exactly one choice must be marked as correct, but found $correctCount"
+                message
+            )
+        }
+        val correctCount = choices.count { it.isCorrect }
+        if (correctCount != 1) {
+            val message = messageSource.getMessage(
+                "assessment.question.choices.correct",
+                arrayOf(correctCount),
+                locale
+            )
+            throw ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                message
             )
         }
     }
@@ -129,4 +187,20 @@ class QuestionService(
         order = this.order,
         mediaId = this.mediaId
     )
+
+    private fun parseSort(sort: String?): Sort {
+        if (sort.isNullOrBlank()) {
+            return Sort.by(Sort.Direction.DESC, "createdAt")
+        }
+
+        val parts = sort.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        val property = parts.firstOrNull() ?: "createdAt"
+        val direction = parts.getOrNull(1)?.lowercase() ?: "asc"
+
+        val allowed = setOf("createdAt", "text", "difficulty")
+        val safeProperty = if (allowed.contains(property)) property else "createdAt"
+        val sortDirection = if (direction == "desc") Sort.Direction.DESC else Sort.Direction.ASC
+
+        return Sort.by(sortDirection, safeProperty)
+    }
 }

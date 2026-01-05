@@ -22,7 +22,25 @@ data class TopicDto(
     val id: UUID,
     val subjectId: UUID,
     val name: String,
-    val description: String?
+    val description: String?,
+    val createdByFullName: String?,
+    val createdAt: OffsetDateTime?,
+    val questionsCount: Long?
+)
+
+data class TopicDetailsDto(
+    val id: UUID,
+    val subjectId: UUID,
+    val subjectName: String?,
+    val name: String,
+    val description: String?,
+    val createdByFullName: String?,
+    val createdAt: OffsetDateTime?
+)
+
+data class UpdateTopicDto(
+    @field:NotBlank val name: String,
+    val description: String? = null
 )
 
 // ============= QUESTION DTOs =============
