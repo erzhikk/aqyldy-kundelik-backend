@@ -39,6 +39,10 @@ class SubjectService(
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Subject not found") }
             .toDto()
 
+    fun findAll(): List<SubjectDto> {
+        return subjectRepository.findAll().map { it.toDto() }
+    }
+
     fun findByClassLevelId(classLevelId: UUID): List<SubjectDto> {
         return subjectRepository.findAllByClassLevelId(classLevelId).map { it.toDto() }
     }

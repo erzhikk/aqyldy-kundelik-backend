@@ -15,5 +15,8 @@ interface UserRepository : JpaRepository<UserEntity, UUID> {
 
     // Staff (teachers and admins)
     fun findAllByRoleInAndIsDeletedFalse(roles: List<String>, pageable: Pageable): Page<UserEntity>
+
+    // Teachers (no pagination)
+    fun findAllByRoleAndIsDeletedFalse(role: String, sort: org.springframework.data.domain.Sort): List<UserEntity>
 }
 interface GroupRepository : JpaRepository<ClassGroupEntity, UUID>

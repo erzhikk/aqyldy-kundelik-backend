@@ -51,8 +51,15 @@ interface TopicRepository : JpaRepository<TopicEntity, UUID> {
 interface TestRepository : JpaRepository<TestEntity, UUID> {
     fun findBySubjectId(subjectId: UUID): List<TestEntity>
     fun findBySubjectIdAndStatus(subjectId: UUID, status: kz.aqyldykundelik.assessment.domain.TestStatus): List<TestEntity>
-    fun findByClassLevelId(classLevelId: UUID): List<TestEntity>
     fun findByStatus(status: kz.aqyldykundelik.assessment.domain.TestStatus): List<TestEntity>
+}
+
+@Repository
+interface TestSchoolClassRepository : JpaRepository<TestSchoolClassEntity, UUID> {
+    fun findByTestId(testId: UUID): List<TestSchoolClassEntity>
+    fun findBySchoolClassId(schoolClassId: UUID): List<TestSchoolClassEntity>
+    fun deleteByTestId(testId: UUID)
+    fun deleteByTestIdAndSchoolClassId(testId: UUID, schoolClassId: UUID)
 }
 
 @Repository

@@ -30,6 +30,9 @@ class UsersController(private val userService: UserService) {
         @RequestParam(defaultValue = "20") size: Int
     ): PageDto<UserDto> = userService.findAllStaff(page, size)
 
+    @GetMapping("/teachers/all")
+    fun teachersAll(): List<UserDto> = userService.findAllTeachersNoPagination()
+
     @PreAuthorize("hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @GetMapping("/deleted")
     fun allDeleted(

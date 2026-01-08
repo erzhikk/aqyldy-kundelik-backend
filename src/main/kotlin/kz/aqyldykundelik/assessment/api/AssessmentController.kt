@@ -63,12 +63,12 @@ class AssessmentController(
     @GetMapping("/tests")
     fun getTests(
         @RequestParam(required = false) subjectId: UUID?,
-        @RequestParam(required = false) classLevelId: UUID?,
+        @RequestParam(required = false) schoolClassId: UUID?,
         @RequestParam(required = false) status: kz.aqyldykundelik.assessment.domain.TestStatus?,
         @RequestParam(defaultValue = "0") page: Int,
         @RequestParam(defaultValue = "20") size: Int
     ): PageDto<TestDto> {
-        return testService.findAll(subjectId, classLevelId, status, page, size)
+        return testService.findAll(subjectId, schoolClassId, status, page, size)
     }
 
     @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER') or hasRole('SUPER_ADMIN')")

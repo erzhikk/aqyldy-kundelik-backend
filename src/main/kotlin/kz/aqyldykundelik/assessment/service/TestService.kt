@@ -6,7 +6,9 @@ import kz.aqyldykundelik.assessment.domain.TestEntity
 import kz.aqyldykundelik.assessment.domain.TestQuestionEntity
 import kz.aqyldykundelik.assessment.domain.TestQuestionId
 import kz.aqyldykundelik.assessment.repo.*
+import kz.aqyldykundelik.classlevels.repo.ClassLevelRepository
 import kz.aqyldykundelik.common.PageDto
+import kz.aqyldykundelik.timetable.repo.SubjectRepository
 import org.springframework.data.domain.PageRequest
 import org.springframework.http.HttpStatus
 import org.springframework.security.core.context.SecurityContextHolder
@@ -18,6 +20,10 @@ import java.util.*
 class TestService(
     private val testRepository: TestRepository,
     private val testQuestionRepository: TestQuestionRepository,
+    private val testSchoolClassRepository: TestSchoolClassRepository,
+    private val classRepository: kz.aqyldykundelik.classes.repo.ClassRepository,
+    private val classLevelRepository: ClassLevelRepository,
+    private val subjectRepository: SubjectRepository,
     private val questionRepository: QuestionRepository,
     private val choiceRepository: ChoiceRepository,
     private val topicRepository: TopicRepository,
@@ -25,10 +31,10 @@ class TestService(
     private val auditService: AuditService
 ) {
 
+    @Transactional
     fun create(dto: CreateTestDto): TestDto {
         val entity = TestEntity(
             subjectId = dto.subjectId,
-            classLevelId = dto.classLevelId,
             name = dto.name,
             description = dto.description,
             durationSec = dto.durationSec,
@@ -43,6 +49,18 @@ class TestService(
         )
         val saved = testRepository.save(entity)
 
+        // Save test-school class assignments
+        val uniqueClassIds = dto.schoolClassIds.distinct()
+        if (uniqueClassIds.isNotEmpty()) {
+            val assignments = uniqueClassIds.map { classId ->
+                kz.aqyldykundelik.assessment.domain.TestSchoolClassEntity(
+                    testId = saved.id!!,
+                    schoolClassId = classId
+                )
+            }
+            testSchoolClassRepository.saveAll(assignments)
+        }
+
         // Audit log
         auditService.log(
             eventType = AuditService.TEST_CREATED,
@@ -52,7 +70,7 @@ class TestService(
             metadata = mapOf(
                 "testName" to saved.name,
                 "subjectId" to saved.subjectId.toString(),
-                "classLevelId" to (saved.classLevelId?.toString() ?: "null"),
+                "schoolClassIds" to dto.schoolClassIds.joinToString(","),
                 "status" to saved.status.name
             )
         )
@@ -68,14 +86,17 @@ class TestService(
         // For published tests, only allow updating certain fields
         if (test.status == kz.aqyldykundelik.assessment.domain.TestStatus.PUBLISHED) {
             // Check if user is trying to change restricted fields
-            if (test.classLevelId != dto.classLevelId ||
+            val currentClassIds = testSchoolClassRepository.findByTestId(id).map { it.schoolClassId }.toSet()
+            val newClassIds = dto.schoolClassIds.toSet()
+
+            if (currentClassIds != newClassIds ||
                 test.durationSec != dto.durationSec ||
                 test.allowedAttempts != dto.allowedAttempts ||
                 test.opensAt != dto.opensAt ||
                 test.closesAt != dto.closesAt) {
                 throw ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "Cannot modify classLevelId, durationSec, allowedAttempts, opensAt, closesAt for published test"
+                    "Cannot modify school classes, durationSec, allowedAttempts, opensAt, closesAt for published test"
                 )
             }
             // Only allow updating these fields for published tests
@@ -85,10 +106,23 @@ class TestService(
             test.shuffleChoices = dto.shuffleChoices
             test.passingPercent = dto.passingPercent
             test.reviewPolicy = dto.reviewPolicy
+
+            // Refresh school class assignments even if they are unchanged
+            testSchoolClassRepository.deleteByTestId(id)
+            testSchoolClassRepository.flush()  // Ensure deletion is committed before inserting
+            val uniqueClassIds = dto.schoolClassIds.distinct()
+            if (uniqueClassIds.isNotEmpty()) {
+                val assignments = uniqueClassIds.map { classId ->
+                    kz.aqyldykundelik.assessment.domain.TestSchoolClassEntity(
+                        testId = id,
+                        schoolClassId = classId
+                    )
+                }
+                testSchoolClassRepository.saveAll(assignments)
+            }
         } else {
             // For draft tests, allow updating all fields
             test.name = dto.name
-            test.classLevelId = dto.classLevelId
             test.description = dto.description
             test.durationSec = dto.durationSec
             test.shuffleQuestions = dto.shuffleQuestions
@@ -98,6 +132,20 @@ class TestService(
             test.closesAt = dto.closesAt
             test.passingPercent = dto.passingPercent
             test.reviewPolicy = dto.reviewPolicy
+
+            // Update school class assignments
+            testSchoolClassRepository.deleteByTestId(id)
+            testSchoolClassRepository.flush()  // Ensure deletion is committed before inserting
+            val uniqueClassIds = dto.schoolClassIds.distinct()
+            if (uniqueClassIds.isNotEmpty()) {
+                val assignments = uniqueClassIds.map { classId ->
+                    kz.aqyldykundelik.assessment.domain.TestSchoolClassEntity(
+                        testId = id,
+                        schoolClassId = classId
+                    )
+                }
+                testSchoolClassRepository.saveAll(assignments)
+            }
         }
 
         val saved = testRepository.save(test)
@@ -125,22 +173,26 @@ class TestService(
 
     fun findAll(
         subjectId: UUID?,
-        classLevelId: UUID?,
+        schoolClassId: UUID?,
         status: kz.aqyldykundelik.assessment.domain.TestStatus?,
         page: Int,
         size: Int
     ): PageDto<TestDto> {
-        val tests = when {
+        var tests = when {
             subjectId != null && status != null ->
                 testRepository.findBySubjectIdAndStatus(subjectId, status)
             subjectId != null ->
                 testRepository.findBySubjectId(subjectId)
-            classLevelId != null ->
-                testRepository.findByClassLevelId(classLevelId)
             status != null ->
                 testRepository.findByStatus(status)
             else ->
                 testRepository.findAll()
+        }
+
+        // Filter by school class if specified
+        if (schoolClassId != null) {
+            val testIds = testSchoolClassRepository.findBySchoolClassId(schoolClassId).map { it.testId }.toSet()
+            tests = tests.filter { it.id in testIds }
         }
 
         val testDtos = tests.map { it.toDto() }
@@ -169,7 +221,17 @@ class TestService(
         val test = testRepository.findById(id)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Test not found") }
 
+        // Load assigned classes
+        val assignedClasses = testSchoolClassRepository.findByTestId(id)
+        val classIds = assignedClasses.map { it.schoolClassId }
+        val schoolClasses = if (classIds.isNotEmpty()) {
+            mapSchoolClasses(classRepository.findAllById(classIds))
+        } else {
+            emptyList()
+        }
+
         val testQuestions = testQuestionRepository.findByTestIdOrderByOrderAsc(id)
+        val subjectInfo = loadSubjectInfo(test.subjectId)
 
         val questionDtos = testQuestions.map { tq ->
             val question = questionRepository.findById(tq.questionId)
@@ -196,7 +258,11 @@ class TestService(
         return TestDetailDto(
             id = test.id!!,
             subjectId = test.subjectId,
-            classLevelId = test.classLevelId,
+            subjectNameRu = subjectInfo?.nameRu,
+            subjectNameKk = subjectInfo?.nameKk,
+            subjectNameEn = subjectInfo?.nameEn,
+            classLevel = subjectInfo?.classLevel,
+            schoolClasses = schoolClasses,
             name = test.name,
             description = test.description,
             durationSec = test.durationSec,
@@ -365,23 +431,38 @@ class TestService(
         return saved.toDto()
     }
 
-    private fun TestEntity.toDto() = TestDto(
-        id = this.id!!,
-        subjectId = this.subjectId,
-        classLevelId = this.classLevelId,
-        name = this.name,
-        description = this.description,
-        durationSec = this.durationSec,
-        maxScore = this.maxScore,
-        status = this.status,
-        shuffleQuestions = this.shuffleQuestions,
-        shuffleChoices = this.shuffleChoices,
-        allowedAttempts = this.allowedAttempts,
-        opensAt = this.opensAt,
-        closesAt = this.closesAt,
-        passingPercent = this.passingPercent,
-        reviewPolicy = this.reviewPolicy
-    )
+    private fun TestEntity.toDto(): TestDto {
+        val assignedClasses = testSchoolClassRepository.findByTestId(this.id!!)
+        val classIds = assignedClasses.map { it.schoolClassId }
+        val classes = if (classIds.isNotEmpty()) {
+            mapSchoolClasses(classRepository.findAllById(classIds))
+        } else {
+            emptyList()
+        }
+        val subjectInfo = loadSubjectInfo(this.subjectId)
+
+        return TestDto(
+            id = this.id!!,
+            subjectId = this.subjectId,
+            subjectNameRu = subjectInfo?.nameRu,
+            subjectNameKk = subjectInfo?.nameKk,
+            subjectNameEn = subjectInfo?.nameEn,
+            classLevel = subjectInfo?.classLevel,
+            schoolClasses = classes,
+            name = this.name,
+            description = this.description,
+            durationSec = this.durationSec,
+            maxScore = this.maxScore,
+            status = this.status,
+            shuffleQuestions = this.shuffleQuestions,
+            shuffleChoices = this.shuffleChoices,
+            allowedAttempts = this.allowedAttempts,
+            opensAt = this.opensAt,
+            closesAt = this.closesAt,
+            passingPercent = this.passingPercent,
+            reviewPolicy = this.reviewPolicy
+        )
+    }
 
     @Transactional
     fun clone(id: UUID): TestDto {
@@ -391,7 +472,6 @@ class TestService(
         // Create new test with DRAFT status
         val clonedTest = TestEntity(
             subjectId = sourceTest.subjectId,
-            classLevelId = sourceTest.classLevelId,
             name = "${sourceTest.name} (Copy)",
             description = sourceTest.description,
             durationSec = sourceTest.durationSec,
@@ -405,6 +485,18 @@ class TestService(
             reviewPolicy = sourceTest.reviewPolicy
         )
         val savedTest = testRepository.save(clonedTest)
+
+        // Copy school class assignments
+        val sourceClassAssignments = testSchoolClassRepository.findByTestId(id)
+        if (sourceClassAssignments.isNotEmpty()) {
+            val clonedAssignments = sourceClassAssignments.map { assignment ->
+                kz.aqyldykundelik.assessment.domain.TestSchoolClassEntity(
+                    testId = savedTest.id!!,
+                    schoolClassId = assignment.schoolClassId
+                )
+            }
+            testSchoolClassRepository.saveAll(clonedAssignments)
+        }
 
         // Copy all test questions
         val sourceQuestions = testQuestionRepository.findByTestIdOrderByOrderAsc(id)
@@ -441,6 +533,43 @@ class TestService(
             auth?.name?.let { UUID.fromString(it) }
         } catch (e: Exception) {
             null
+        }
+    }
+
+    private data class SubjectInfo(
+        val nameRu: String?,
+        val nameKk: String?,
+        val nameEn: String?,
+        val classLevel: Int?
+    )
+
+    private fun loadSubjectInfo(subjectId: UUID): SubjectInfo? {
+        val subject = subjectRepository.findById(subjectId).orElse(null) ?: return null
+        val classLevelId = subject.classLevel?.id
+        val classLevel = classLevelId?.let { classLevelRepository.findById(it).orElse(null)?.level }
+        return SubjectInfo(
+            nameRu = subject.nameRu,
+            nameKk = subject.nameKk,
+            nameEn = subject.nameEn,
+            classLevel = classLevel
+        )
+    }
+
+    private fun mapSchoolClasses(classes: List<kz.aqyldykundelik.classes.domain.ClassEntity>): List<SchoolClassDto> {
+        val classLevelIds = classes.mapNotNull { it.classLevelId }.distinct()
+        val classLevelsById = if (classLevelIds.isEmpty()) {
+            emptyMap()
+        } else {
+            classLevelRepository.findAllById(classLevelIds).associateBy { it.id }
+        }
+
+        return classes.map { classEntity ->
+            val classLevel = classEntity.classLevelId?.let { classLevelsById[it]?.level }
+            SchoolClassDto(
+                id = classEntity.id!!,
+                code = classEntity.code ?: "",
+                classLevel = classLevel
+            )
         }
     }
 }

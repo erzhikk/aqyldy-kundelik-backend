@@ -8,6 +8,7 @@ import kz.aqyldykundelik.classes.api.mappers.toDto
 import kz.aqyldykundelik.classes.api.mappers.toEntity
 import kz.aqyldykundelik.classes.repo.ClassRepository
 import kz.aqyldykundelik.common.PageDto
+import kz.aqyldykundelik.users.repo.UserRepository
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
 import org.springframework.http.HttpStatus
@@ -16,13 +17,16 @@ import org.springframework.web.server.ResponseStatusException
 import java.util.*
 
 @Service
-class ClassService(private val classRepository: ClassRepository) {
+class ClassService(
+    private val classRepository: ClassRepository,
+    private val userRepository: UserRepository
+) {
 
     fun findAll(page: Int = 0, size: Int = 20): PageDto<ClassDto> {
         val pageable = PageRequest.of(page, size, Sort.by("code"))
         val result = classRepository.findAll(pageable)
         return PageDto(
-            content = result.content.map { it.toDto() },
+            content = mapToDtosWithTeacherNames(result.content),
             page = result.number,
             size = result.size,
             totalElements = result.totalElements,
@@ -31,24 +35,24 @@ class ClassService(private val classRepository: ClassRepository) {
     }
 
     fun findAllNoPagination(): List<ClassDto> {
-        return classRepository.findAll(Sort.by("code")).map { it.toDto() }
+        return mapToDtosWithTeacherNames(classRepository.findAll(Sort.by("code")))
     }
 
     fun findById(id: UUID): ClassDto =
         classRepository.findById(id)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Class not found") }
-            .toDto()
+            .let { mapToDtosWithTeacherNames(listOf(it)).first() }
 
     fun findByCode(code: String): ClassDto =
         classRepository.findByCode(code)
-            ?.toDto()
+            ?.let { mapToDtosWithTeacherNames(listOf(it)).first() }
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Class not found")
 
     fun findByLangType(langType: String, page: Int = 0, size: Int = 20): PageDto<ClassDto> {
         val pageable = PageRequest.of(page, size, Sort.by("code"))
         val result = classRepository.findByLangType(langType, pageable)
         return PageDto(
-            content = result.content.map { it.toDto() },
+            content = mapToDtosWithTeacherNames(result.content),
             page = result.number,
             size = result.size,
             totalElements = result.totalElements,
@@ -60,7 +64,7 @@ class ClassService(private val classRepository: ClassRepository) {
         val pageable = PageRequest.of(page, size, Sort.by("code"))
         val result = classRepository.findByClassTeacherId(teacherId, pageable)
         return PageDto(
-            content = result.content.map { it.toDto() },
+            content = mapToDtosWithTeacherNames(result.content),
             page = result.number,
             size = result.size,
             totalElements = result.totalElements,
@@ -69,13 +73,13 @@ class ClassService(private val classRepository: ClassRepository) {
     }
 
     fun create(createDto: CreateClassDto): ClassDto =
-        classRepository.save(createDto.toEntity()).toDto()
+        mapToDtosWithTeacherNames(listOf(classRepository.save(createDto.toEntity()))).first()
 
     fun update(id: UUID, updateDto: UpdateClassDto): ClassDto {
         val entity = classRepository.findById(id)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Class not found") }
         entity.applyUpdate(updateDto)
-        return classRepository.save(entity).toDto()
+        return mapToDtosWithTeacherNames(listOf(classRepository.save(entity))).first()
     }
 
     fun removeTeacher(id: UUID) {
@@ -90,5 +94,19 @@ class ClassService(private val classRepository: ClassRepository) {
             throw ResponseStatusException(HttpStatus.NOT_FOUND, "Class not found")
         }
         classRepository.deleteById(id)
+    }
+
+    private fun mapToDtosWithTeacherNames(classes: List<kz.aqyldykundelik.classes.domain.ClassEntity>): List<ClassDto> {
+        val teacherIds = classes.mapNotNull { it.classTeacherId }.distinct()
+        val teachersById = if (teacherIds.isEmpty()) {
+            emptyMap()
+        } else {
+            userRepository.findAllById(teacherIds).associateBy { it.id }
+        }
+
+        return classes.map { classEntity ->
+            val teacherFullName = classEntity.classTeacherId?.let { teachersById[it]?.fullName }
+            classEntity.toDto(teacherFullName)
+        }
     }
 }

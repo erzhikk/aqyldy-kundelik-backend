@@ -87,11 +87,19 @@ data class QuestionDto(
     val choices: List<ChoiceDto>
 )
 
+// ============= SCHOOL CLASS DTO =============
+
+data class SchoolClassDto(
+    val id: UUID,
+    val code: String,
+    val classLevel: Int?
+)
+
 // ============= TEST DTOs =============
 
 data class CreateTestDto(
     @field:NotNull val subjectId: UUID,
-    val classLevelId: UUID? = null,
+    val schoolClassIds: List<UUID> = emptyList(),
     @field:NotBlank val name: String,
     val description: String? = null,
     val durationSec: Int? = null,
@@ -106,7 +114,7 @@ data class CreateTestDto(
 
 data class UpdateTestDto(
     @field:NotBlank val name: String,
-    val classLevelId: UUID? = null,
+    val schoolClassIds: List<UUID> = emptyList(),
     val description: String? = null,
     val durationSec: Int? = null,
     val allowedAttempts: Int? = null,
@@ -121,7 +129,11 @@ data class UpdateTestDto(
 data class TestDto(
     val id: UUID,
     val subjectId: UUID,
-    val classLevelId: UUID?,
+    val subjectNameRu: String?,
+    val subjectNameKk: String?,
+    val subjectNameEn: String?,
+    val classLevel: Int?,
+    val schoolClasses: List<SchoolClassDto>,
     val name: String,
     val description: String?,
     val durationSec: Int?,
@@ -139,7 +151,11 @@ data class TestDto(
 data class TestDetailDto(
     val id: UUID,
     val subjectId: UUID,
-    val classLevelId: UUID?,
+    val subjectNameRu: String?,
+    val subjectNameKk: String?,
+    val subjectNameEn: String?,
+    val classLevel: Int?,
+    val schoolClasses: List<SchoolClassDto>,
     val name: String,
     val description: String?,
     val durationSec: Int?,

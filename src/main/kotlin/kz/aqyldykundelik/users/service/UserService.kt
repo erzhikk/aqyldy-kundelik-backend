@@ -92,6 +92,11 @@ class UserService(
         )
     }
 
+    fun findAllTeachersNoPagination(): List<UserDto> {
+        val result = userRepository.findAllByRoleAndIsDeletedFalse("TEACHER", Sort.by("fullName"))
+        return result.map { it.toDto(generatePhotoUrl(it)) }
+    }
+
     fun findAllDeleted(page: Int = 0, size: Int = 20): PageDto<UserDto> {
         val pageable = PageRequest.of(page, size, Sort.by("fullName"))
         val result = userRepository.findAllByIsDeletedTrue(pageable)

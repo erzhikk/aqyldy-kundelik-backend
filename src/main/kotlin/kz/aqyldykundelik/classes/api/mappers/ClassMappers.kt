@@ -3,10 +3,11 @@ package kz.aqyldykundelik.classes.api.mappers
 import kz.aqyldykundelik.classes.api.dto.*
 import kz.aqyldykundelik.classes.domain.ClassEntity
 
-fun ClassEntity.toDto() = ClassDto(
+fun ClassEntity.toDto(classTeacherFullName: String? = null) = ClassDto(
     id = this.id!!,
     code = this.code!!,
     classTeacherId = this.classTeacherId,
+    classTeacherFullName = classTeacherFullName,
     classLevelId = this.classLevelId,
     langType = this.langType!!
 )

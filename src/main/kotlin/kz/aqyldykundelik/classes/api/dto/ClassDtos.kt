@@ -8,6 +8,7 @@ data class ClassDto(
     val id: UUID,
     val code: String,
     val classTeacherId: UUID?,
+    val classTeacherFullName: String? = null,
     val classLevelId: UUID?,
     val langType: String
 )

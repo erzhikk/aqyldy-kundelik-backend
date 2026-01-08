@@ -19,6 +19,9 @@ class SubjectController(private val subjectService: SubjectService) {
         @RequestParam(defaultValue = "20") size: Int
     ): PageDto<SubjectDto> = subjectService.search(q, page, size)
 
+    @GetMapping("/all")
+    fun listAll(): List<SubjectDto> = subjectService.findAll()
+
     @GetMapping("/{id}")
     fun getById(@PathVariable id: UUID): SubjectDto = subjectService.findById(id)
 
