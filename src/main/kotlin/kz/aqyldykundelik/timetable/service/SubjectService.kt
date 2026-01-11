@@ -34,13 +34,26 @@ class SubjectService(
         )
     }
 
+    fun searchByClassLevel(classLevelId: UUID, query: String?, page: Int = 0, size: Int = 20): PageDto<SubjectDto> {
+        val pageable = PageRequest.of(page, size)
+        val result = subjectRepository.searchByClassLevel(classLevelId, query, pageable)
+        return PageDto(
+            content = result.content.map { it.toDto() },
+            page = result.number,
+            size = result.size,
+            totalElements = result.totalElements,
+            totalPages = result.totalPages
+        )
+    }
+
     fun findById(id: UUID): SubjectDto =
         subjectRepository.findById(id)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Subject not found") }
             .toDto()
 
     fun findAll(): List<SubjectDto> {
-        return subjectRepository.findAll().map { it.toDto() }
+        val pageable = PageRequest.of(0, Int.MAX_VALUE)
+        return subjectRepository.findAllOrderByClassLevelAndName(pageable).content.map { it.toDto() }
     }
 
     fun findByClassLevelId(classLevelId: UUID): List<SubjectDto> {
@@ -48,8 +61,8 @@ class SubjectService(
     }
 
     fun findByClassLevel(classLevelId: UUID, page: Int = 0, size: Int = 20): PageDto<SubjectDto> {
-        val pageable = PageRequest.of(page, size, Sort.by("nameRu"))
-        val result = subjectRepository.findByClassLevel_Id(classLevelId, pageable)
+        val pageable = PageRequest.of(page, size)
+        val result = subjectRepository.searchByClassLevel(classLevelId, null, pageable)
         return PageDto(
             content = result.content.map { it.toDto() },
             page = result.number,

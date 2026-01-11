@@ -4,8 +4,10 @@ import jakarta.validation.Valid
 import kz.aqyldykundelik.common.PageDto
 import kz.aqyldykundelik.users.api.dto.*
 import kz.aqyldykundelik.users.service.UserService
+import org.springframework.http.MediaType
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.*
+import org.springframework.web.multipart.MultipartFile
 import java.util.*
 
 @RestController
@@ -44,8 +46,15 @@ class UsersController(private val userService: UserService) {
     fun one(@PathVariable id: UUID): UserDto = userService.findById(id)
 
     @PreAuthorize("hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
-    @PostMapping
+    @PostMapping(consumes = [MediaType.APPLICATION_JSON_VALUE])
     fun create(@Valid @RequestBody body: CreateUserDto): UserDto = userService.create(body)
+
+    @PreAuthorize("hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
+    @PostMapping(consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
+    fun createWithPhoto(
+        @Valid @RequestPart("user") body: CreateUserDto,
+        @RequestPart("file") file: MultipartFile
+    ): UserDto = userService.createWithPhoto(body, file)
 
     @PreAuthorize("hasRole('ADMIN') or hasRole('SUPER_ADMIN')")
     @PutMapping("/{id}")

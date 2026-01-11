@@ -2,6 +2,7 @@ package kz.aqyldykundelik.assessment.service
 
 import jakarta.transaction.Transactional
 import kz.aqyldykundelik.assessment.api.dto.*
+import kz.aqyldykundelik.assessment.domain.QuestionEntity
 import kz.aqyldykundelik.assessment.domain.TestEntity
 import kz.aqyldykundelik.assessment.domain.TestQuestionEntity
 import kz.aqyldykundelik.assessment.domain.TestQuestionId
@@ -217,6 +218,37 @@ class TestService(
         )
     }
 
+    fun getQuestions(id: UUID): List<TestQuestionDto> {
+        // Verify test exists
+        testRepository.findById(id)
+            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Test not found") }
+
+        val testQuestions = testQuestionRepository.findByTestIdOrderByOrderAsc(id)
+
+        return testQuestions.map { tq ->
+            val question = questionRepository.findById(tq.questionId)
+                .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Question not found") }
+            val choices = choiceRepository.findByQuestionId(tq.questionId)
+
+            TestQuestionDto(
+                questionId = question.id!!,
+                text = question.text,
+                difficulty = question.difficulty,
+                order = tq.order,
+                weight = tq.weight,
+                choices = choices.sortedBy { it.order }.map {
+                    ChoiceDto(
+                        id = it.id!!,
+                        text = it.text,
+                        isCorrect = it.isCorrect,
+                        order = it.order,
+                        mediaId = it.mediaId
+                    )
+                }
+            )
+        }
+    }
+
     fun findById(id: UUID): TestDetailDto {
         val test = testRepository.findById(id)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Test not found") }
@@ -233,25 +265,56 @@ class TestService(
         val testQuestions = testQuestionRepository.findByTestIdOrderByOrderAsc(id)
         val subjectInfo = loadSubjectInfo(test.subjectId)
 
-        val questionDtos = testQuestions.map { tq ->
+        // Group questions by topic, preserving order
+        val topicQuestionsMap = linkedMapOf<UUID, MutableList<Pair<TestQuestionEntity, QuestionEntity>>>()
+
+        testQuestions.forEach { tq ->
             val question = questionRepository.findById(tq.questionId)
                 .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Question not found") }
-            val choices = choiceRepository.findByQuestionId(tq.questionId)
 
-            TestQuestionDto(
-                questionId = question.id!!,
-                text = question.text,
-                difficulty = question.difficulty,
-                order = tq.order,
-                weight = tq.weight,
-                choices = choices.sortedBy { it.order }.map {
-                    AttemptChoiceDto(
-                        id = it.id!!,
-                        text = it.text,
-                        order = it.order,
-                        mediaId = it.mediaId
-                    )
-                }
+            topicQuestionsMap.computeIfAbsent(question.topicId) { mutableListOf() }
+                .add(Pair(tq, question))
+        }
+
+        // Load topic information for all topics
+        val topicIds = topicQuestionsMap.keys.toList()
+        val topicsById = if (topicIds.isEmpty()) {
+            emptyMap()
+        } else {
+            topicRepository.findAllById(topicIds).associateBy { it.id!! }
+        }
+
+        // Build TestTopicDto list
+        val topics = topicQuestionsMap.map { (topicId, questionPairs) ->
+            val topic = topicsById[topicId]
+                ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Topic $topicId not found")
+
+            val questionDtos = questionPairs.map { (tq, question) ->
+                val choices = choiceRepository.findByQuestionId(question.id!!)
+
+                TestQuestionDto(
+                    questionId = question.id!!,
+                    text = question.text,
+                    difficulty = question.difficulty,
+                    order = tq.order,
+                    weight = tq.weight,
+                    choices = choices.sortedBy { it.order }.map {
+                        ChoiceDto(
+                            id = it.id!!,
+                            text = it.text,
+                            isCorrect = it.isCorrect,
+                            order = it.order,
+                            mediaId = it.mediaId
+                        )
+                    }
+                )
+            }
+
+            TestTopicDto(
+                topicId = topicId,
+                topicName = topic.name,
+                topicDescription = topic.description,
+                questions = questionDtos
             )
         }
 
@@ -275,7 +338,7 @@ class TestService(
             closesAt = test.closesAt,
             passingPercent = test.passingPercent,
             reviewPolicy = test.reviewPolicy,
-            questions = questionDtos
+            topics = topics
         )
     }
 
@@ -289,7 +352,7 @@ class TestService(
         }
 
         // Validate: all questions must belong to topics with the same subjectId as test
-        dto.items.forEach { item ->
+        dto.questions.forEach { item ->
             val question = questionRepository.findById(item.questionId)
                 .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Question ${item.questionId} not found") }
 
@@ -305,7 +368,7 @@ class TestService(
         }
 
         // Create test-question associations
-        val testQuestions = dto.items.map {
+        val testQuestions = dto.questions.map {
             TestQuestionEntity(
                 testId = testId,
                 questionId = it.questionId,
@@ -316,7 +379,7 @@ class TestService(
         testQuestionRepository.saveAll(testQuestions)
 
         // Recalculate maxScore
-        val maxScore = dto.items.sumOf { it.weight }
+        val maxScore = dto.questions.sumOf { it.weight }
         test.maxScore = maxScore
         val saved = testRepository.save(test)
 
@@ -333,7 +396,7 @@ class TestService(
         }
 
         // Update order and weight for each question
-        dto.items.forEach { item ->
+        dto.questions.forEach { item ->
             val testQuestion = testQuestionRepository.findById(
                 TestQuestionId(testId, item.questionId)
             ).orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Test question not found") }
@@ -344,7 +407,7 @@ class TestService(
         }
 
         // Recalculate maxScore
-        val maxScore = dto.items.sumOf { it.weight }
+        val maxScore = dto.questions.sumOf { it.weight }
         test.maxScore = maxScore
         val saved = testRepository.save(test)
 

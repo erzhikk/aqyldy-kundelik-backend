@@ -99,6 +99,32 @@ class QuestionService(
         }
     }
 
+    fun findByTopics(topicIds: List<UUID>, subjectId: UUID?, limit: Int?): List<QuestionDto> {
+        if (topicIds.isEmpty()) {
+            return emptyList()
+        }
+
+        val questions = questionRepository.findByTopicIdInAndSubjectId(topicIds, subjectId)
+        val limitedQuestions = if (limit != null && limit > 0) {
+            questions.take(limit)
+        } else {
+            questions
+        }
+
+        // Batch load choices for all questions
+        val questionIds = limitedQuestions.mapNotNull { it.id }
+        val choicesByQuestionId = if (questionIds.isEmpty()) {
+            emptyMap()
+        } else {
+            choiceRepository.findByQuestionIdIn(questionIds).groupBy { it.questionId }
+        }
+
+        return limitedQuestions.map { question ->
+            val choices = choicesByQuestionId[question.id].orEmpty().sortedBy { it.order }
+            question.toDto(choices)
+        }
+    }
+
     fun findByTopicWithAnswers(
         topicId: UUID,
         search: String?,

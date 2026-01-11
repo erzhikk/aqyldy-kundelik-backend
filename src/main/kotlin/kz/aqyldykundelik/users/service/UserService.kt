@@ -8,6 +8,7 @@ import kz.aqyldykundelik.config.AppProperties
 import kz.aqyldykundelik.media.domain.MediaObjectStatus
 import kz.aqyldykundelik.media.repo.MediaObjectRepository
 import kz.aqyldykundelik.media.service.MediaCleanupService
+import kz.aqyldykundelik.media.service.MediaUploadService
 import kz.aqyldykundelik.timetable.repo.SubjectRepository
 import kz.aqyldykundelik.timetable.repo.TimetableLessonRepository
 import kz.aqyldykundelik.users.api.dto.*
@@ -20,6 +21,7 @@ import org.springframework.data.domain.Sort
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.server.ResponseStatusException
+import org.springframework.web.multipart.MultipartFile
 import java.text.Collator
 import java.util.*
 
@@ -33,6 +35,7 @@ class UserService(
     private val groupRepository: GroupRepository,
     private val mediaObjectRepository: MediaObjectRepository,
     private val mediaCleanupService: MediaCleanupService,
+    private val mediaUploadService: MediaUploadService,
     private val appProperties: AppProperties
 ) {
 
@@ -53,8 +56,8 @@ class UserService(
     }
 
     fun findAllStudents(page: Int = 0, size: Int = 20): PageDto<UserDto> {
-        val pageable = PageRequest.of(page, size, Sort.by("fullName"))
-        val result = userRepository.findAllByRoleAndIsDeletedFalse("STUDENT", pageable)
+        val pageable = PageRequest.of(page, size)
+        val result = userRepository.findAllStudentsOrderByClassAndName("STUDENT", pageable)
 
         // Загружаем все классы одним запросом для избежания N+1
         val classIds = result.content.mapNotNull { it.classId }
@@ -81,8 +84,8 @@ class UserService(
 
     fun findAllStaff(page: Int = 0, size: Int = 20): PageDto<UserDto> {
         val staffRoles = listOf("TEACHER", "ADMIN", "ADMIN_SCHEDULE", "ADMIN_ASSESSMENT", "SUPER_ADMIN")
-        val pageable = PageRequest.of(page, size, Sort.by("fullName"))
-        val result = userRepository.findAllByRoleInAndIsDeletedFalse(staffRoles, pageable)
+        val pageable = PageRequest.of(page, size)
+        val result = userRepository.findAllStaffOrderByClassAndName(staffRoles, pageable)
         return PageDto(
             content = result.content.map { it.toDto(generatePhotoUrl(it)) },
             page = result.number,
@@ -129,6 +132,38 @@ class UserService(
 
         val savedUser = userRepository.save(createDto.toEntity())
         return savedUser.toDto(generatePhotoUrl(savedUser))
+    }
+
+    fun createWithPhoto(createDto: CreateUserDto, file: MultipartFile): UserDto {
+        if (createDto.role != "STUDENT" && createDto.classId != null) {
+            throw ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "classId can only be assigned to users with role STUDENT"
+            )
+        }
+
+        if (createDto.photoMediaId != null) {
+            throw ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "photoMediaId is not allowed when uploading a photo file"
+            )
+        }
+
+        val savedUser = userRepository.save(createDto.copy(photoMediaId = null).toEntity())
+
+        return try {
+            val upload = mediaUploadService.uploadPhoto(savedUser.id!!, file)
+            savedUser.photoMediaId = upload.mediaObjectId
+            val updatedUser = userRepository.save(savedUser)
+            updatedUser.toDto(generatePhotoUrl(updatedUser))
+        } catch (e: Exception) {
+            try {
+                userRepository.delete(savedUser)
+            } catch (_: Exception) {
+                // Best-effort cleanup only
+            }
+            throw e
+        }
     }
 
     fun update(id: UUID, updateDto: UpdateUserDto): UserDto {

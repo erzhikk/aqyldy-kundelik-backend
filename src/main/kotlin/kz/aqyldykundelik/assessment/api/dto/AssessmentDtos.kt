@@ -168,7 +168,7 @@ data class TestDetailDto(
     val closesAt: OffsetDateTime?,
     val passingPercent: BigDecimal?,
     val reviewPolicy: ReviewPolicy?,
-    val questions: List<TestQuestionDto>
+    val topics: List<TestTopicDto>
 )
 
 data class TestQuestionDto(
@@ -177,7 +177,14 @@ data class TestQuestionDto(
     val difficulty: Difficulty,
     val order: Int,
     val weight: Int,
-    val choices: List<AttemptChoiceDto>  // No isCorrect - preview as student sees it
+    val choices: List<ChoiceDto>  // With isCorrect for teachers/admins
+)
+
+data class TestTopicDto(
+    val topicId: UUID,
+    val topicName: String,
+    val topicDescription: String?,
+    val questions: List<TestQuestionDto>
 )
 
 // ============= TEST QUESTION MANAGEMENT DTOs =============
@@ -189,11 +196,11 @@ data class TestQuestionItemDto(
 )
 
 data class AddQuestionsToTestDto(
-    @field:NotEmpty val items: List<TestQuestionItemDto>
+    @field:NotEmpty val questions: List<TestQuestionItemDto>
 )
 
 data class ReorderQuestionsDto(
-    @field:NotEmpty val items: List<TestQuestionItemDto>
+    @field:NotEmpty val questions: List<TestQuestionItemDto>
 )
 
 // ============= STUDENT ATTEMPT DTOs =============

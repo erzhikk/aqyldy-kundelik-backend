@@ -4,6 +4,7 @@ import jakarta.validation.Valid
 import kz.aqyldykundelik.classes.api.dto.*
 import kz.aqyldykundelik.classes.service.ClassService
 import kz.aqyldykundelik.common.PageDto
+import kz.aqyldykundelik.users.api.dto.UserDto
 import org.springframework.http.HttpStatus
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.*
@@ -23,7 +24,10 @@ class ClassController(private val classService: ClassService) {
     fun listAll(): List<ClassDto> = classService.findAllNoPagination()
 
     @GetMapping("/{id}")
-    fun getById(@PathVariable id: UUID): ClassDto = classService.findById(id)
+    fun getById(@PathVariable id: UUID): ClassDetailDto = classService.findDetailById(id)
+
+    @GetMapping("/{id}/students")
+    fun getStudents(@PathVariable id: UUID): List<UserDto> = classService.findStudentsByClassId(id)
 
     @GetMapping("/by-code/{code}")
     fun getByCode(@PathVariable code: String): ClassDto = classService.findByCode(code)

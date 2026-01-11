@@ -7,6 +7,7 @@ import kz.aqyldykundelik.assessment.service.AttemptService
 import kz.aqyldykundelik.assessment.service.AuditService
 import kz.aqyldykundelik.assessment.service.TestService
 import kz.aqyldykundelik.common.PageDto
+import kz.aqyldykundelik.users.repo.UserRepository
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.security.access.prepost.PreAuthorize
@@ -20,20 +21,20 @@ import java.util.*
 @RequestMapping("/api/assess")
 class AssessmentController(
     private val testService: TestService,
+    private val questionService: kz.aqyldykundelik.assessment.service.QuestionService,
     private val attemptService: AttemptService,
     private val analyticsService: AnalyticsService,
-    private val auditService: AuditService
+    private val auditService: AuditService,
+    private val userRepository: UserRepository
 ) {
     private val logger = LoggerFactory.getLogger(AssessmentController::class.java)
 
     private fun getStudentIdFromAuth(auth: Authentication): UUID {
-        val userId = auth.name  // JWT subject = userId
-        return try {
-            UUID.fromString(userId)
-        } catch (e: IllegalArgumentException) {
-            logger.error("Failed to parse userId from JWT. auth.name = '$userId'", e)
-            throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid user ID format in token")
-        }
+        val email = auth.name
+        val user = userRepository.findByEmail(email)
+            ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "User not found")
+        return user.id
+            ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "User ID is missing")
     }
 
     // ============= TEST ENDPOINTS =============
@@ -59,6 +60,34 @@ class AssessmentController(
         testService.delete(id)
     }
 
+    @PreAuthorize("isAuthenticated()")
+    @GetMapping("/tests", params = ["published=true"])
+    fun getPublishedTests(
+        @RequestParam(required = false) subjectId: UUID?,
+        @RequestParam(required = false) schoolClassId: UUID?,
+        @RequestParam(defaultValue = "0") page: Int,
+        @RequestParam(defaultValue = "20") size: Int,
+        auth: Authentication
+    ): PageDto<TestDto> {
+        val effectiveSchoolClassId = if (auth.authorities.any { it.authority == "ROLE_STUDENT" }) {
+            val studentId = getStudentIdFromAuth(auth)
+            val student = userRepository.findById(studentId)
+                .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Student not found") }
+            student.classId
+                ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Student is not assigned to a class")
+        } else {
+            schoolClassId
+        }
+
+        return testService.findAll(
+            subjectId,
+            effectiveSchoolClassId,
+            kz.aqyldykundelik.assessment.domain.TestStatus.PUBLISHED,
+            page,
+            size
+        )
+    }
+
     @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER') or hasRole('SUPER_ADMIN')")
     @GetMapping("/tests")
     fun getTests(
@@ -75,6 +104,12 @@ class AssessmentController(
     @GetMapping("/tests/{id}")
     fun getTestDetail(@PathVariable id: UUID): TestDetailDto {
         return testService.findById(id)
+    }
+
+    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER') or hasRole('SUPER_ADMIN')")
+    @GetMapping("/tests/{id}/questions")
+    fun getTestQuestions(@PathVariable id: UUID): List<TestQuestionDto> {
+        return testService.getQuestions(id)
     }
 
     @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER') or hasRole('SUPER_ADMIN')")
@@ -105,6 +140,18 @@ class AssessmentController(
     @PostMapping("/tests/{id}/clone")
     fun cloneTest(@PathVariable id: UUID): TestDto {
         return testService.clone(id)
+    }
+
+    // ============= QUESTION ENDPOINTS =============
+
+    @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER') or hasRole('SUPER_ADMIN')")
+    @GetMapping("/questions/by-topics")
+    fun getQuestionsByTopics(
+        @RequestParam topicIds: List<UUID>,
+        @RequestParam(required = false) subjectId: UUID?,
+        @RequestParam(required = false) size: Int?
+    ): List<QuestionDto> {
+        return questionService.findByTopics(topicIds, subjectId, size)
     }
 
     // ============= STUDENT ATTEMPT ENDPOINTS =============

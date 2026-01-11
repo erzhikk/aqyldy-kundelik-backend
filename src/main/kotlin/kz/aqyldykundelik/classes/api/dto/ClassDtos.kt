@@ -2,6 +2,7 @@ package kz.aqyldykundelik.classes.api.dto
 
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
+import kz.aqyldykundelik.users.api.dto.UserDto
 import java.util.*
 
 data class ClassDto(
@@ -11,6 +12,12 @@ data class ClassDto(
     val classTeacherFullName: String? = null,
     val classLevelId: UUID?,
     val langType: String
+)
+
+data class ClassDetailDto(
+    val classInfo: ClassDto,
+    val students: List<UserDto>,
+    val teacher: UserDto?
 )
 
 data class CreateClassDto(

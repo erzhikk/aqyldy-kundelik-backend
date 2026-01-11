@@ -83,6 +83,18 @@ interface QuestionRepository : JpaRepository<QuestionEntity, UUID> {
         @Param("topicId") topicId: UUID?,
         @Param("difficulty") difficulty: Difficulty?
     ): List<QuestionEntity>
+
+    @Query("""
+        SELECT q FROM QuestionEntity q
+        JOIN TopicEntity t ON q.topicId = t.id
+        WHERE q.topicId IN :topicIds
+        AND (:subjectId IS NULL OR t.subjectId = :subjectId)
+        ORDER BY q.topicId, q.difficulty
+    """)
+    fun findByTopicIdInAndSubjectId(
+        @Param("topicIds") topicIds: List<UUID>,
+        @Param("subjectId") subjectId: UUID?
+    ): List<QuestionEntity>
 }
 
 @Repository
