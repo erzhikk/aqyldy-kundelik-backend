@@ -120,6 +120,7 @@ interface TestAttemptRepository : JpaRepository<TestAttemptEntity, UUID> {
     fun findByStudentId(studentId: UUID): List<TestAttemptEntity>
     fun findByStudentIdAndTestId(studentId: UUID, testId: UUID): List<TestAttemptEntity>
     fun findByStatus(status: AttemptStatus): List<TestAttemptEntity>
+    fun findByStudentIdAndStatusOrderByFinishedAtDesc(studentId: UUID, status: AttemptStatus): List<TestAttemptEntity>
 
     @Query("SELECT COUNT(ta) FROM TestAttemptEntity ta WHERE ta.testId = :testId")
     fun countByTestId(@Param("testId") testId: UUID): Long
@@ -153,6 +154,42 @@ interface TestAttemptRepository : JpaRepository<TestAttemptEntity, UUID> {
         @Param("classId") classId: UUID,
         @Param("testId") testId: UUID
     ): List<TestAttemptEntity>
+
+    // Analytics: Find last graded attempt for a student
+    @Query("""
+        SELECT ta.* FROM test_attempt ta
+        WHERE ta.student_id = :studentId
+        AND ta.status = 'GRADED'
+        ORDER BY ta.finished_at DESC NULLS LAST
+        LIMIT 1
+    """, nativeQuery = true)
+    fun findLastGradedAttemptByStudentId(@Param("studentId") studentId: UUID): TestAttemptEntity?
+
+    // Analytics: Find latest graded attempt for each student in a class for a specific test
+    @Query("""
+        SELECT DISTINCT ON (ta.student_id) ta.*
+        FROM test_attempt ta
+        JOIN app_user u ON u.id = ta.student_id
+        WHERE ta.test_id = :testId
+          AND u.class_id = :classId
+          AND ta.status = 'GRADED'
+        ORDER BY ta.student_id, ta.finished_at DESC
+    """, nativeQuery = true)
+    fun findLatestGradedAttemptsByClassAndTest(
+        @Param("classId") classId: UUID,
+        @Param("testId") testId: UUID
+    ): List<TestAttemptEntity>
+
+    // Analytics: Find last test attempt for a class (any student)
+    @Query("""
+        SELECT ta.* FROM test_attempt ta
+        JOIN app_user u ON ta.student_id = u.id
+        WHERE u.class_id = :classId
+        AND ta.status = 'GRADED'
+        ORDER BY ta.finished_at DESC NULLS LAST
+        LIMIT 1
+    """, nativeQuery = true)
+    fun findLastGradedAttemptByClassId(@Param("classId") classId: UUID): TestAttemptEntity?
 }
 
 @Repository

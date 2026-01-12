@@ -46,6 +46,10 @@ class ClassController(private val classService: ClassService) {
         @RequestParam(defaultValue = "20") size: Int
     ): PageDto<ClassDto> = classService.findByTeacher(teacherId, page, size)
 
+    @GetMapping("/by-class-level/{classLevelId}")
+    fun getByClassLevel(@PathVariable classLevelId: UUID): List<ClassDto> =
+        classService.findByClassLevelId(classLevelId)
+
     @PreAuthorize("hasRole('ADMIN') or hasRole('ADMIN_SCHEDULE') or hasRole('SUPER_ADMIN')")
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)

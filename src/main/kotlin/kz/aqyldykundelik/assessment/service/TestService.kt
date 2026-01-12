@@ -34,7 +34,15 @@ class TestService(
 
     @Transactional
     fun create(dto: CreateTestDto): TestDto {
+        // Load subject for validation
+        val subject = subjectRepository.findById(dto.subjectId)
+            .orElseThrow { ResponseStatusException(HttpStatus.BAD_REQUEST, "Subject not found") }
+
+        // Validate classLevelId, subject, and classes consistency
+        validateTestData(dto.classLevelId, subject, dto.schoolClassIds)
+
         val entity = TestEntity(
+            classLevelId = dto.classLevelId,
             subjectId = dto.subjectId,
             name = dto.name,
             description = dto.description,
@@ -84,20 +92,28 @@ class TestService(
         val test = testRepository.findById(id)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Test not found") }
 
+        // Load subject for validation
+        val subject = subjectRepository.findById(test.subjectId)
+            .orElseThrow { ResponseStatusException(HttpStatus.BAD_REQUEST, "Subject not found") }
+
+        // Validate classLevelId, subject, and classes consistency
+        validateTestData(dto.classLevelId, subject, dto.schoolClassIds)
+
         // For published tests, only allow updating certain fields
         if (test.status == kz.aqyldykundelik.assessment.domain.TestStatus.PUBLISHED) {
             // Check if user is trying to change restricted fields
             val currentClassIds = testSchoolClassRepository.findByTestId(id).map { it.schoolClassId }.toSet()
             val newClassIds = dto.schoolClassIds.toSet()
 
-            if (currentClassIds != newClassIds ||
+            if (test.classLevelId != dto.classLevelId ||
+                currentClassIds != newClassIds ||
                 test.durationSec != dto.durationSec ||
                 test.allowedAttempts != dto.allowedAttempts ||
                 test.opensAt != dto.opensAt ||
                 test.closesAt != dto.closesAt) {
                 throw ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "Cannot modify school classes, durationSec, allowedAttempts, opensAt, closesAt for published test"
+                    "Cannot modify classLevelId, school classes, durationSec, allowedAttempts, opensAt, closesAt for published test"
                 )
             }
             // Only allow updating these fields for published tests
@@ -123,6 +139,7 @@ class TestService(
             }
         } else {
             // For draft tests, allow updating all fields
+            test.classLevelId = dto.classLevelId
             test.name = dto.name
             test.description = dto.description
             test.durationSec = dto.durationSec
@@ -249,6 +266,31 @@ class TestService(
         }
     }
 
+    fun canStudentAttemptTest(studentId: UUID, testId: UUID): Boolean {
+        val test = testRepository.findById(testId).orElse(null) ?: return false
+
+        // If no attempt limit, student can always attempt
+        val limit = test.allowedAttempts ?: return true
+
+        // Check how many attempts the student has made
+        val existingAttempts = testAttemptRepository.findByStudentIdAndTestId(studentId, testId)
+
+        return existingAttempts.size < limit
+    }
+
+    fun canStudentSeeTest(studentId: UUID, testId: UUID): Boolean {
+        val test = testRepository.findById(testId).orElse(null) ?: return false
+        val existingAttempts = testAttemptRepository.findByStudentIdAndTestId(studentId, testId)
+
+        // Show test if there is an ongoing attempt so student can resume.
+        if (existingAttempts.any { it.status == kz.aqyldykundelik.assessment.domain.AttemptStatus.IN_PROGRESS }) {
+            return true
+        }
+
+        val limit = test.allowedAttempts ?: return true
+        return existingAttempts.size < limit
+    }
+
     fun findById(id: UUID): TestDetailDto {
         val test = testRepository.findById(id)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Test not found") }
@@ -320,6 +362,7 @@ class TestService(
 
         return TestDetailDto(
             id = test.id!!,
+            classLevelId = test.classLevelId,
             subjectId = test.subjectId,
             subjectNameRu = subjectInfo?.nameRu,
             subjectNameKk = subjectInfo?.nameKk,
@@ -506,6 +549,7 @@ class TestService(
 
         return TestDto(
             id = this.id!!,
+            classLevelId = this.classLevelId,
             subjectId = this.subjectId,
             subjectNameRu = subjectInfo?.nameRu,
             subjectNameKk = subjectInfo?.nameKk,
@@ -534,6 +578,7 @@ class TestService(
 
         // Create new test with DRAFT status
         val clonedTest = TestEntity(
+            classLevelId = sourceTest.classLevelId,
             subjectId = sourceTest.subjectId,
             name = "${sourceTest.name} (Copy)",
             description = sourceTest.description,
@@ -616,6 +661,41 @@ class TestService(
             nameEn = subject.nameEn,
             classLevel = classLevel
         )
+    }
+
+    private fun validateTestData(classLevelId: UUID, subject: kz.aqyldykundelik.timetable.domain.SubjectEntity, schoolClassIds: List<UUID>) {
+        // 1. Validate that classLevel exists
+        val classLevel = classLevelRepository.findById(classLevelId)
+            .orElseThrow { ResponseStatusException(HttpStatus.BAD_REQUEST, "Class level not found") }
+
+        // 2. Validate that subject belongs to this classLevel
+        if (subject.classLevel?.id != classLevelId) {
+            throw ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Subject does not belong to the specified class level. Subject belongs to class level ${subject.classLevel?.level ?: "unknown"}, but test is for class level ${classLevel.level}"
+            )
+        }
+
+        // 3. Validate that all classes belong to this classLevel
+        if (schoolClassIds.isNotEmpty()) {
+            val classes = classRepository.findAllById(schoolClassIds)
+
+            if (classes.size != schoolClassIds.size) {
+                throw ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "One or more classes not found"
+                )
+            }
+
+            val invalidClasses = classes.filter { it.classLevelId != classLevelId }
+            if (invalidClasses.isNotEmpty()) {
+                val invalidCodes = invalidClasses.joinToString(", ") { it.code ?: it.id.toString() }
+                throw ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Classes [$invalidCodes] do not belong to class level ${classLevel.level}. All classes must belong to the same class level as the test."
+                )
+            }
+        }
     }
 
     private fun mapSchoolClasses(classes: List<kz.aqyldykundelik.classes.domain.ClassEntity>): List<SchoolClassDto> {

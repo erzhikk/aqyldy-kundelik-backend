@@ -95,6 +95,11 @@ class ClassService(
         )
     }
 
+    fun findByClassLevelId(classLevelId: UUID): List<ClassDto> {
+        val classes = classRepository.findByClassLevelIdOrderByGradeAndLetter(classLevelId)
+        return mapToDtosWithTeacherNames(classes)
+    }
+
     fun findStudentsByClassId(classId: UUID): List<UserDto> {
         if (!classRepository.existsById(classId)) {
             throw ResponseStatusException(HttpStatus.NOT_FOUND, "Class not found")

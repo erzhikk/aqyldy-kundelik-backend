@@ -5,6 +5,7 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
+import org.springframework.web.server.ResponseStatusException
 import java.time.Instant
 
 @RestControllerAdvice
@@ -35,6 +36,17 @@ class GlobalExceptionHandler {
     fun handleNotFound(e: NoSuchElementException): ResponseEntity<ErrorBody> {
         val body = ErrorBody(status = 404, error = "Not Found", message = e.message)
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body)
+    }
+
+    @ExceptionHandler(ResponseStatusException::class)
+    fun handleResponseStatus(e: ResponseStatusException): ResponseEntity<ErrorBody> {
+        val status = e.statusCode.value()
+        val body = ErrorBody(
+            status = status,
+            error = e.reason ?: e.statusCode.toString(),
+            message = e.reason
+        )
+        return ResponseEntity.status(e.statusCode).body(body)
     }
 
     @ExceptionHandler(Exception::class)

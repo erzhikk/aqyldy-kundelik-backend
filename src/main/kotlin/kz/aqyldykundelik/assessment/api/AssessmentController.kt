@@ -69,9 +69,11 @@ class AssessmentController(
         @RequestParam(defaultValue = "20") size: Int,
         auth: Authentication
     ): PageDto<TestDto> {
-        val effectiveSchoolClassId = if (auth.authorities.any { it.authority == "ROLE_STUDENT" }) {
-            val studentId = getStudentIdFromAuth(auth)
-            val student = userRepository.findById(studentId)
+        val isStudent = auth.authorities.any { it.authority == "ROLE_STUDENT" }
+        val studentId = if (isStudent) getStudentIdFromAuth(auth) else null
+
+        val effectiveSchoolClassId = if (isStudent) {
+            val student = userRepository.findById(studentId!!)
                 .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Student not found") }
             student.classId
                 ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Student is not assigned to a class")
@@ -79,13 +81,27 @@ class AssessmentController(
             schoolClassId
         }
 
-        return testService.findAll(
+        val result = testService.findAll(
             subjectId,
             effectiveSchoolClassId,
             kz.aqyldykundelik.assessment.domain.TestStatus.PUBLISHED,
             page,
             size
         )
+
+        // Filter out tests where student has exhausted attempts
+        if (isStudent && studentId != null) {
+            val filteredContent = result.content.filter { test ->
+                testService.canStudentSeeTest(studentId, test.id)
+            }
+            return result.copy(
+                content = filteredContent,
+                totalElements = filteredContent.size.toLong(),
+                totalPages = if (result.size > 0) ((filteredContent.size + result.size - 1) / result.size) else 1
+            )
+        }
+
+        return result
     }
 
     @PreAuthorize("hasRole('ADMIN_ASSESSMENT') or hasRole('TEACHER') or hasRole('SUPER_ADMIN')")

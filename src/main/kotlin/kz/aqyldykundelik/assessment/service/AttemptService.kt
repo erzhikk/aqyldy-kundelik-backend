@@ -34,9 +34,21 @@ class AttemptService(
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Test is not published")
         }
 
+        val existingAttempts = testAttemptRepository.findByStudentIdAndTestId(studentId, testId)
+        val inProgressAttempt = existingAttempts
+            .filter { it.status == AttemptStatus.IN_PROGRESS }
+            .maxByOrNull { it.startedAt ?: OffsetDateTime.MIN }
+        if (inProgressAttempt != null) {
+            return buildStartAttemptResponse(
+                test,
+                testId,
+                inProgressAttempt.id!!,
+                inProgressAttempt.startedAt
+            )
+        }
+
         // Проверка: лимит попыток
         test.allowedAttempts?.let { limit ->
-            val existingAttempts = testAttemptRepository.findByStudentIdAndTestId(studentId, testId)
             if (existingAttempts.size >= limit) {
                 throw ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
@@ -66,7 +78,16 @@ class AttemptService(
             )
         )
 
-        // Получаем вопросы теста
+
+        return buildStartAttemptResponse(test, testId, savedAttempt.id!!, savedAttempt.startedAt)
+    }
+
+    private fun buildStartAttemptResponse(
+        test: TestEntity,
+        testId: UUID,
+        attemptId: UUID,
+        startedAt: OffsetDateTime?
+    ): StartAttemptResponseDto {
         val testQuestions = testQuestionRepository.findByTestIdOrderByOrderAsc(testId)
 
         val questionDtos = testQuestions.map { tq ->
@@ -74,8 +95,6 @@ class AttemptService(
                 .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Question not found") }
 
             val choices = choiceRepository.findByQuestionId(tq.questionId)
-
-            // Применяем shuffle для choices если нужно
             val orderedChoices = if (test.shuffleChoices) {
                 choices.shuffled()
             } else {
@@ -92,23 +111,31 @@ class AttemptService(
                         text = choice.text,
                         order = choice.order,
                         mediaId = choice.mediaId
-                        // НЕТ isCorrect - скрыто от студента!
                     )
                 }
             )
         }
 
-        // Применяем shuffle для вопросов если нужно
         val orderedQuestions = if (test.shuffleQuestions) {
             questionDtos.shuffled()
         } else {
             questionDtos
         }
 
+        val remainingDurationSec = test.durationSec?.let { duration ->
+            val elapsed = if (startedAt != null) {
+                OffsetDateTime.now().toEpochSecond() - startedAt.toEpochSecond()
+            } else {
+                0
+            }
+            val remaining = duration.toLong() - elapsed
+            if (remaining > 0) remaining.toInt() else 0
+        }
+
         return StartAttemptResponseDto(
-            attemptId = savedAttempt.id!!,
+            attemptId = attemptId,
             testId = testId,
-            durationSec = test.durationSec,
+            durationSec = remainingDurationSec,
             questions = orderedQuestions
         )
     }

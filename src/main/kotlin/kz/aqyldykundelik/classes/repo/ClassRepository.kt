@@ -68,4 +68,18 @@ interface ClassRepository : JpaRepository<ClassEntity, UUID> {
         nativeQuery = true
     )
     fun findAllOrderByGradeAndLetter(): List<ClassEntity>
+
+    @Query(
+        value = """
+            select *
+            from school_class
+            where class_level_id = :classLevelId
+            order by
+                cast(nullif(regexp_replace(code, E'\\D', '', 'g'), '') as int),
+                regexp_replace(code, E'\\d', '', 'g'),
+                code
+        """,
+        nativeQuery = true
+    )
+    fun findByClassLevelIdOrderByGradeAndLetter(classLevelId: UUID): List<ClassEntity>
 }

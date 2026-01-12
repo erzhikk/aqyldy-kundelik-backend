@@ -98,6 +98,7 @@ data class SchoolClassDto(
 // ============= TEST DTOs =============
 
 data class CreateTestDto(
+    @field:NotNull val classLevelId: UUID,
     @field:NotNull val subjectId: UUID,
     val schoolClassIds: List<UUID> = emptyList(),
     @field:NotBlank val name: String,
@@ -113,6 +114,7 @@ data class CreateTestDto(
 )
 
 data class UpdateTestDto(
+    @field:NotNull val classLevelId: UUID,
     @field:NotBlank val name: String,
     val schoolClassIds: List<UUID> = emptyList(),
     val description: String? = null,
@@ -128,6 +130,7 @@ data class UpdateTestDto(
 
 data class TestDto(
     val id: UUID,
+    val classLevelId: UUID,
     val subjectId: UUID,
     val subjectNameRu: String?,
     val subjectNameKk: String?,
@@ -150,6 +153,7 @@ data class TestDto(
 
 data class TestDetailDto(
     val id: UUID,
+    val classLevelId: UUID,
     val subjectId: UUID,
     val subjectNameRu: String?,
     val subjectNameKk: String?,
@@ -292,4 +296,87 @@ data class ClassTestAnalyticsDto(
     val avgPercent: Double,
     val distribution: List<ScoreDistributionDto>,
     val topWeakTopics: List<WeakTopicDto>
+)
+
+// ============= NEW ANALYTICS DTOs (BACKEND-TASKS-4) =============
+
+// Student Analytics DTOs
+
+data class LastAttemptDto(
+    val attemptId: UUID,
+    val testId: UUID,
+    val testName: String,
+    val finishedAt: OffsetDateTime?
+)
+
+data class StudentAttemptSummaryDto(
+    val testId: UUID,
+    val testName: String,
+    val subjectId: UUID,
+    val subjectNameRu: String?,
+    val subjectNameKk: String?,
+    val subjectNameEn: String?,
+    val attemptId: UUID,
+    val totalQuestions: Int,
+    val correctAnswers: Int,
+    val wrongAnswers: Int,
+    val percent: BigDecimal,
+    val strongTopics: List<String>,
+    val weakTopics: List<String>,
+    val attemptDate: OffsetDateTime?
+)
+
+data class TopicScoreDto(
+    val topicId: UUID,
+    val topicName: String,
+    val total: Int,
+    val correct: Int,
+    val wrong: Int,
+    val skipped: Int?,
+    val percent: BigDecimal
+)
+
+data class QuestionDetailDto(
+    val questionId: UUID,
+    val text: String,
+    val choiceId: UUID?,
+    val isCorrect: Boolean?,
+    val explanation: String?
+)
+
+// Teacher Analytics DTOs
+
+data class ClassInfoDto(
+    val classId: UUID,
+    val className: String
+)
+
+data class ClassTestSummaryDto(
+    val testId: UUID,
+    val testName: String,
+    val testDate: OffsetDateTime?,
+    val avgPercent: BigDecimal,
+    val medianPercent: BigDecimal?,
+    val weakTopics: List<String>,
+    val riskStudentsCount: Int
+)
+
+data class ClassTopicAnalyticsDto(
+    val topicId: UUID,
+    val topicName: String,
+    val avgPercent: BigDecimal,
+    val medianPercent: BigDecimal?,
+    val studentsCount: Int
+)
+
+data class WorstQuestionDto(
+    val questionId: UUID,
+    val text: String,
+    val answersCount: Int,
+    val wrongCount: Int,
+    val wrongPercent: BigDecimal
+)
+
+data class TopicDrillDownDto(
+    val topWeakQuestions: List<WorstQuestionDto>
 )

@@ -15,6 +15,9 @@ class TestEntity(
     @Column(name = "subject_id", nullable = false)
     var subjectId: UUID = UUID.randomUUID(),
 
+    @Column(name = "class_level_id", nullable = false)
+    var classLevelId: UUID = UUID.randomUUID(),
+
     @Column(nullable = false)
     var name: String = "",
 
