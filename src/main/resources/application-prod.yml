@@ -19,3 +19,15 @@ spring:
 # Application Configuration
 app:
   base-url: ${APP_BASE_URL:https://api.aqyldy.kz}
+
+ai:
+  enabled: true
+  provider: stub
+  model: gpt-4o-mini
+  maxTokens: 700
+  temperature: 0.4
+  cacheTtlDays:
+    plan: 7
+    topicHelp: 3
+  limits:
+    perStudentPerDay: 5

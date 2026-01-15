@@ -39,3 +39,15 @@ minio:
   bucket-name: aq-media
   region: us-east-1
   path-style-access: true  # Обязательно для MinIO
+
+ai:
+  enabled: true
+  provider: stub
+  model: gpt-4o-mini
+  maxTokens: 700
+  temperature: 0.4
+  cacheTtlDays:
+    plan: 7
+    topicHelp: 3
+  limits:
+    perStudentPerDay: 5
