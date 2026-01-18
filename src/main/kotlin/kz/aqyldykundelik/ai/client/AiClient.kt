@@ -1,6 +1,9 @@
 package kz.aqyldykundelik.ai.client
 
+import kz.aqyldykundelik.ai.domain.AiGeneratedType
+
 data class AiGenerateRequest(
+    val type: AiGeneratedType,
     val system: String,
     val user: String,
     val model: String,

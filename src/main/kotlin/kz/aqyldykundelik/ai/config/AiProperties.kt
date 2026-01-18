@@ -6,8 +6,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 data class AiProperties(
     val enabled: Boolean = true,
     val provider: String = "stub",
-    val model: String = "gpt-4o-mini",
-    val maxTokens: Int = 700,
+    val model: String = "gpt-4.1-mini",
+    val maxTokens: Int = 900,
     val temperature: Double = 0.4,
     val cacheTtlDays: CacheTtlDays = CacheTtlDays(),
     val limits: Limits = Limits()

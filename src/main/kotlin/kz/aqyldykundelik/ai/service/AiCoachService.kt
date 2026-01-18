@@ -7,6 +7,8 @@ import kz.aqyldykundelik.ai.config.AiProperties
 import kz.aqyldykundelik.ai.domain.AiGeneratedContentEntity
 import kz.aqyldykundelik.ai.domain.AiGeneratedType
 import kz.aqyldykundelik.ai.repo.AiGeneratedContentRepository
+import kz.aqyldykundelik.ai.dto.AiPlanResponseDto
+import kz.aqyldykundelik.ai.dto.AiTopicHelpResponseDto
 import kz.aqyldykundelik.assessment.api.dto.AiGeneratedDto
 import kz.aqyldykundelik.assessment.service.AnalyticsService
 import org.springframework.http.HttpStatus
@@ -25,6 +27,7 @@ class AiCoachService(
     private val objectMapper: ObjectMapper
 ) {
     private val snapshotVersion = "v1"
+    private val schemaVersion = "v1"
 
     fun generatePlan(studentId: UUID, attemptId: UUID, language: String?): AiGeneratedDto {
         ensureEnabled()
@@ -49,6 +52,7 @@ class AiCoachService(
         val systemPrompt = buildSystemPrompt(resolvedLanguage)
         val result = aiClient.generate(
             AiGenerateRequest(
+                type = AiGeneratedType.PLAN,
                 system = systemPrompt,
                 user = userPrompt,
                 model = aiProperties.model,
@@ -56,6 +60,7 @@ class AiCoachService(
                 temperature = aiProperties.temperature
             )
         )
+        val payload = parsePayload(AiGeneratedType.PLAN, result.content)
 
         val saved = aiGeneratedContentRepository.save(
             AiGeneratedContentEntity(
@@ -73,7 +78,7 @@ class AiCoachService(
             )
         )
 
-        return toDto(saved, cached = false)
+        return toDto(saved, cached = false, payload = payload)
     }
 
     fun generateTopicHelp(
@@ -106,6 +111,7 @@ class AiCoachService(
         val systemPrompt = buildSystemPrompt(resolvedLanguage)
         val result = aiClient.generate(
             AiGenerateRequest(
+                type = AiGeneratedType.TOPIC_HELP,
                 system = systemPrompt,
                 user = userPrompt,
                 model = aiProperties.model,
@@ -113,6 +119,7 @@ class AiCoachService(
                 temperature = aiProperties.temperature
             )
         )
+        val payload = parsePayload(AiGeneratedType.TOPIC_HELP, result.content)
 
         val saved = aiGeneratedContentRepository.save(
             AiGeneratedContentEntity(
@@ -130,7 +137,7 @@ class AiCoachService(
             )
         )
 
-        return toDto(saved, cached = false)
+        return toDto(saved, cached = false, payload = payload)
     }
 
     private fun ensureEnabled() {
@@ -173,10 +180,13 @@ class AiCoachService(
                     "explanation" to question.explanation
                 )
             }
+            val mainMistake = wrongQuestions.mapNotNull { it.explanation }.firstOrNull()
+                ?: "Ошибки в решении задач по теме"
             mapOf(
                 "topicId" to topic.topicId,
                 "topicName" to topic.topicName,
-                "percent" to topic.percent,
+                "accuracy" to (topic.percent.toDouble() / 100.0),
+                "mainMistake" to mainMistake,
                 "wrongCount" to details.count { it.isCorrect == false },
                 "exampleWrongQuestions" to examples
             )
@@ -190,6 +200,8 @@ class AiCoachService(
     }
 
     private fun buildTopicHelpSnapshot(attemptId: UUID, topicId: UUID, studentId: UUID): Map<String, Any> {
+        val topics = analyticsService.getAttemptTopics(attemptId, studentId)
+        val topicName = topics.firstOrNull { it.topicId == topicId }?.topicName ?: "Unknown"
         val details = analyticsService.getAttemptTopicDetails(attemptId, topicId, studentId)
         val wrongQuestions = details.filter { it.isCorrect != true }.take(5).map { question ->
             mapOf(
@@ -202,42 +214,47 @@ class AiCoachService(
             "snapshotVersion" to snapshotVersion,
             "attemptId" to attemptId,
             "topicId" to topicId,
+            "topicName" to topicName,
             "wrongQuestions" to wrongQuestions
         )
     }
 
     private fun buildSystemPrompt(language: String): String {
         return """
-            You are an AI learning coach. Language: $language.
-            Style: concise, step-by-step. Do not request personal data.
-            Do not mention tokens, models, or system details.
+            Ты школьный ИИ-репетитор.
+            Язык ответа: $language.
+            Стиль: учебный, краткий.
+            Запрещено: markdown, лишний текст, пояснения вне схемы.
+            Отвечай строго валидным JSON по схеме.
         """.trimIndent()
     }
 
     private fun buildPlanUserPrompt(snapshot: Map<String, Any>): String {
         val snapshotJson = objectMapper.writeValueAsString(snapshot)
         return """
-            Type: PLAN
+            Тип: PLAN
             Snapshot: $snapshotJson
-            Requirements:
-            - list weak topics
-            - 7-day plan (10-15 minutes per day)
-            - 2-3 short rules or formulas
-            - 3 self-check questions
+            Требования:
+            - список слабых тем
+            - план на 7 дней по 10-15 минут
+            - 2-3 коротких правила или формулы
+            - 3 вопроса для самопроверки
+            Верни строго JSON по схеме.
         """.trimIndent()
     }
 
     private fun buildTopicHelpUserPrompt(snapshot: Map<String, Any>, mode: String): String {
         val snapshotJson = objectMapper.writeValueAsString(snapshot)
         return """
-            Type: TOPIC_HELP
-            Mode: $mode
+            Тип: TOPIC_HELP
+            Режим: $mode
             Snapshot: $snapshotJson
-            Requirements:
-            - explain the main mistake
-            - provide 2 correct examples
-            - give 5 practice tasks with answers
-            - use existing explanations when available
+            Требования:
+            - объясни главную ошибку
+            - приведи 2 правильных примера
+            - дай 5 задач для практики с ответами
+            - используй существующие объяснения, если есть
+            Верни строго JSON по схеме.
         """.trimIndent()
     }
 
@@ -256,7 +273,8 @@ class AiCoachService(
             topicId?.toString() ?: "-",
             language ?: "-",
             mode ?: "-",
-            snapshotVersion
+            snapshotVersion,
+            "schema=$schemaVersion"
         ).joinToString("|")
         return sha256Hex(raw)
     }
@@ -267,12 +285,13 @@ class AiCoachService(
         return bytes.joinToString("") { "%02x".format(it) }
     }
 
-    private fun toDto(entity: AiGeneratedContentEntity, cached: Boolean): AiGeneratedDto {
+    private fun toDto(entity: AiGeneratedContentEntity, cached: Boolean, payload: Any? = null): AiGeneratedDto {
+        val resolvedPayload = payload ?: parsePayload(AiGeneratedType.valueOf(entity.type), entity.content)
         return AiGeneratedDto(
             type = entity.type,
             attemptId = entity.attemptId,
             topicId = entity.topicId,
-            content = entity.content,
+            payload = resolvedPayload,
             cached = cached,
             createdAt = entity.createdAt
         )
@@ -283,6 +302,17 @@ class AiCoachService(
         return when (normalized) {
             "ru", "kk", "en" -> normalized
             else -> "ru"
+        }
+    }
+
+    private fun parsePayload(type: AiGeneratedType, content: String): Any {
+        return try {
+            when (type) {
+                AiGeneratedType.PLAN -> objectMapper.readValue(content, AiPlanResponseDto::class.java)
+                AiGeneratedType.TOPIC_HELP -> objectMapper.readValue(content, AiTopicHelpResponseDto::class.java)
+            }
+        } catch (ex: Exception) {
+            throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "AI response mapping failed")
         }
     }
 }

@@ -23,11 +23,15 @@ app:
 ai:
   enabled: true
   provider: stub
-  model: gpt-4o-mini
-  maxTokens: 700
+  model: gpt-4.1-mini
+  maxTokens: 900
   temperature: 0.4
   cacheTtlDays:
     plan: 7
     topicHelp: 3
   limits:
     perStudentPerDay: 5
+
+openai:
+  apiKey: ${OPENAI_API_KEY:}
+  baseUrl: https://api.openai.com/v1

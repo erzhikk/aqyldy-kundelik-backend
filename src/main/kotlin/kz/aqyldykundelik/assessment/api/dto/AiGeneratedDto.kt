@@ -7,7 +7,7 @@ data class AiGeneratedDto(
     val type: String,
     val attemptId: UUID?,
     val topicId: UUID?,
-    val content: String,
+    val payload: Any,
     val cached: Boolean,
     val createdAt: OffsetDateTime
 )
