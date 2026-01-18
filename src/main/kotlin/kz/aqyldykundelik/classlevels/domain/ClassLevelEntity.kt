@@ -12,6 +12,7 @@ class ClassLevelEntity(
     @Column(name = "name_ru", nullable = false) var nameRu: String? = null,
     @Column(name = "name_kk", nullable = false) var nameKk: String? = null,
     @Column(name = "max_lessons_per_day", nullable = false) var maxLessonsPerDay: Int = 7,
+    @Column(name = "days_per_week", nullable = false) var daysPerWeek: Int = 5,
     @Column(name = "created_at") var createdAt: OffsetDateTime? = null,
     @Column(name = "updated_at") var updatedAt: OffsetDateTime? = null
 ) {

@@ -19,14 +19,10 @@ class CurriculumService(
     private val curriculumSubjectHoursRepository: CurriculumSubjectHoursRepository
 ) {
 
-    companion object {
-        const val DEFAULT_DAYS_PER_WEEK = 5
-    }
-
     fun getAllLevels(): List<ClassLevelDto> {
         return classLevelRepository.findAll(Sort.by("level"))
             .filter { it.level in 1..11 }
-            .map { ClassLevelDto(it.id!!, it.level!!, it.nameRu!!, it.nameKk!!, it.maxLessonsPerDay) }
+            .map { ClassLevelDto(it.id!!, it.level!!, it.nameRu!!, it.nameKk!!, it.maxLessonsPerDay, it.daysPerWeek) }
     }
 
     fun getSubjectsByLevel(classLevelId: UUID): CurriculumLevelSubjectsDto {
@@ -49,16 +45,17 @@ class CurriculumService(
         }
 
         val totalHours = subjectDtos.sumOf { it.hoursPerWeek }
-        val maxHoursPerWeek = classLevel.maxLessonsPerDay * DEFAULT_DAYS_PER_WEEK
+        val maxHoursPerWeek = classLevel.maxLessonsPerDay * classLevel.daysPerWeek
         val warnings = mutableListOf<String>()
 
         if (totalHours > maxHoursPerWeek) {
-            warnings.add("Сумма часов ($totalHours) превышает максимум ($maxHoursPerWeek = ${classLevel.maxLessonsPerDay} уроков/день × $DEFAULT_DAYS_PER_WEEK дней)")
+            warnings.add("Сумма часов ($totalHours) превышает максимум ($maxHoursPerWeek = ${classLevel.maxLessonsPerDay} уроков/день × ${classLevel.daysPerWeek} дней)")
         }
 
         return CurriculumLevelSubjectsDto(
             classLevelId = classLevelId,
             maxLessonsPerDay = classLevel.maxLessonsPerDay,
+            daysPerWeek = classLevel.daysPerWeek,
             maxHoursPerWeek = maxHoursPerWeek,
             totalHoursPerWeek = totalHours,
             subjects = subjectDtos,
@@ -68,9 +65,13 @@ class CurriculumService(
 
     @Transactional
     fun updateSubjectHours(classLevelId: UUID, updateDto: UpdateCurriculumSubjectsDto): CurriculumLevelSubjectsDto {
-        if (!classLevelRepository.existsById(classLevelId)) {
-            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Class level not found")
-        }
+        val classLevel = classLevelRepository.findById(classLevelId)
+            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Class level not found") }
+
+        // Update level settings if provided
+        updateDto.maxLessonsPerDay?.let { classLevel.maxLessonsPerDay = it }
+        updateDto.daysPerWeek?.let { classLevel.daysPerWeek = it }
+        classLevelRepository.save(classLevel)
 
         for (item in updateDto.items) {
             val existing = curriculumSubjectHoursRepository.findByClassLevelIdAndSubjectId(classLevelId, item.subjectId)
@@ -95,9 +96,11 @@ class CurriculumService(
         val classLevel = classLevelRepository.findById(classLevelId)
             .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Class level not found") }
 
-        classLevel.maxLessonsPerDay = updateDto.maxLessonsPerDay
+        updateDto.maxLessonsPerDay?.let { classLevel.maxLessonsPerDay = it }
+        updateDto.daysPerWeek?.let { classLevel.daysPerWeek = it }
+
         val saved = classLevelRepository.save(classLevel)
 
-        return ClassLevelDto(saved.id!!, saved.level!!, saved.nameRu!!, saved.nameKk!!, saved.maxLessonsPerDay)
+        return ClassLevelDto(saved.id!!, saved.level!!, saved.nameRu!!, saved.nameKk!!, saved.maxLessonsPerDay, saved.daysPerWeek)
     }
 }

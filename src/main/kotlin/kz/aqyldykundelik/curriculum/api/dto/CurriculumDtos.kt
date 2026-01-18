@@ -11,7 +11,8 @@ data class ClassLevelDto(
     val level: Int,
     val nameRu: String,
     val nameKk: String,
-    val maxLessonsPerDay: Int
+    val maxLessonsPerDay: Int,
+    val daysPerWeek: Int
 )
 
 data class CurriculumSubjectDto(
@@ -25,6 +26,7 @@ data class CurriculumSubjectDto(
 data class CurriculumLevelSubjectsDto(
     val classLevelId: UUID,
     val maxLessonsPerDay: Int,
+    val daysPerWeek: Int,
     val maxHoursPerWeek: Int,
     val totalHoursPerWeek: Int,
     val subjects: List<CurriculumSubjectDto>,
@@ -37,9 +39,12 @@ data class UpdateSubjectHoursItemDto(
 )
 
 data class UpdateCurriculumSubjectsDto(
-    @field:Valid val items: List<UpdateSubjectHoursItemDto>
+    @field:Valid val items: List<UpdateSubjectHoursItemDto>,
+    @field:Min(1) @field:Max(10) val maxLessonsPerDay: Int? = null,
+    @field:Min(5) @field:Max(6) val daysPerWeek: Int? = null
 )
 
 data class UpdateClassLevelSettingsDto(
-    @field:Min(1) @field:Max(10) val maxLessonsPerDay: Int
+    @field:Min(1) @field:Max(10) val maxLessonsPerDay: Int? = null,
+    @field:Min(5) @field:Max(6) val daysPerWeek: Int? = null
 )
