@@ -3,7 +3,6 @@ package kz.aqyldykundelik.schedule.api.dto
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
-import jakarta.validation.constraints.NotNull
 import java.util.*
 
 data class ScheduleLessonDto(
@@ -17,7 +16,9 @@ data class ScheduleLessonDto(
 
 data class ScheduleConflictDto(
     val type: String,
+    val critical: Boolean,
     val teacherId: UUID?,
+    val subjectId: UUID?,
     val dayOfWeek: Int,
     val lessonNumber: Int,
     val message: String
@@ -30,7 +31,8 @@ data class ClassScheduleDto(
     val daysPerWeek: Int,
     val lessonsPerDay: Int,
     val grid: List<ScheduleLessonDto>,
-    val conflicts: List<ScheduleConflictDto>
+    val conflicts: List<ScheduleConflictDto>,
+    val hasCriticalConflicts: Boolean
 )
 
 data class UpdateScheduleLessonDto(
@@ -46,7 +48,16 @@ data class UpdateClassScheduleDto(
 )
 
 object ConflictType {
+    // Critical - block activation
     const val TEACHER_BUSY = "TEACHER_BUSY"
+    const val PLAN_EXCEEDS_SLOTS = "PLAN_EXCEEDS_SLOTS"
+    const val INVALID_SLOT_RANGE = "INVALID_SLOT_RANGE"
+
+    // Non-critical - warnings only
     const val HOURS_MISMATCH = "HOURS_MISMATCH"
     const val MAX_LESSONS_EXCEEDED = "MAX_LESSONS_EXCEEDED"
+
+    private val criticalTypes = setOf(TEACHER_BUSY, PLAN_EXCEEDS_SLOTS, INVALID_SLOT_RANGE)
+
+    fun isCritical(type: String): Boolean = type in criticalTypes
 }

@@ -3,6 +3,8 @@ package kz.aqyldykundelik.schedule.api
 import jakarta.validation.Valid
 import kz.aqyldykundelik.schedule.api.dto.*
 import kz.aqyldykundelik.schedule.service.ScheduleService
+import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
 import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.web.bind.annotation.*
 import java.util.*
@@ -25,4 +27,8 @@ class ScheduleController(private val scheduleService: ScheduleService) {
     @PostMapping("/classes/{classId}/activate")
     fun activateSchedule(@PathVariable classId: UUID): ClassScheduleDto =
         scheduleService.activateSchedule(classId)
+
+    @ExceptionHandler(ScheduleActivationException::class)
+    fun handleScheduleActivationException(ex: ScheduleActivationException): ResponseEntity<ClassScheduleDto> =
+        ResponseEntity.status(HttpStatus.CONFLICT).body(ex.scheduleDto)
 }
